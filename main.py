@@ -3,6 +3,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy
 import statsmodels.api as sm
+import time
+
+"""
+class CSR_KB:
+
+    def __init__(self, endog, breakpoints, exog = None, weights = None):
+        self.exog = exog
+        self.breakpoints = breakpoints
+        self.endog = endog
+        self.weights = weights
+        if weights is not None:
+"""
 
 def whiten(Xs, ys, w: list = None, Ws: list = None):
     # Assertions?
@@ -45,36 +57,38 @@ def fit(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = None,
     A = np.zeros((m-1,m-1))
     c = np.zeros(m-1)
 
-    Xs_i = []
-    Xs_iy = []
-    
-    Xs_i[0] = np.linalg.inv(np.dot(Xs[0].T, Xs[0]) + mu[0]*np.identity(len(Xs[0][0, :])))
-    Xs_i[1] = np.linalg.inv(np.dot(Xs[1].T, Xs[1]) + mu[1]*np.identity(len(Xs[1][0, :])))
+    Xs_i = {}
+    Xs_iy = {}
+
+    Xs_i[0] = np.linalg.inv(np.dot(Xs[0].T, Xs[0]) + mu[0]*np.identity(Xs[0].shape[1]))
+    Xs_i[1] = np.linalg.inv(np.dot(Xs[1].T, Xs[1]) + mu[1]*np.identity(Xs[1].shape[1]))
+
+    Xs_iy[0] = np.linalg.multi_dot([Xs_i[0], Xs[0].T, ys[0]])
+    Xs_iy[1] = np.linalg.multi_dot([Xs_i[1], Xs[1].T, ys[1]])
 
     A[0][0] = np.linalg.multi_dot([Xs[1][0, :], Xs_i[0] + Xs_i[1], Xs[1][0, :]])
     A[0][1] = -np.linalg.multi_dot([Xs[1][0, :], Xs_i[1], Xs[2][0, :]])
     
-    c[0] = 2*np.linalg.multi_dot([Xs[1][0, :], Xs_i[0], Xs[0].T, ys[0]]).item()
-    c[0] -= 2*np.linalg.multi_dot([Xs[1][0, :], Xs_i[1], Xs[1].T, ys[1]]).item()
+    c[0] = np.dot(Xs[1][0, :], Xs_iy[0] - Xs_iy[1]).item()
     
     for j in range(1, m-2):
-        Xs_i[j+1] = np.linalg.inv(np.dot(Xs[j+1].T, Xs[j+1]) + mu[j+1] * np.identity(len(Xs[j+1][0, :])))
+        Xs_i[j+1] = np.linalg.inv(np.dot(Xs[j+1].T, Xs[j+1]) + mu[j+1] * np.identity(Xs[j+1].shape[1]))
+        Xs_iy[j+1] = np.linalg.multi_dot([Xs_i[j+1], Xs[j+1].T, ys[j+1]])
 
         A[j][j-1] = A[j-1][j]
         A[j][j] = np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j] + Xs_i[j+1], Xs[j+1][0, :]])
         A[j][j+1] = -np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j+1], Xs[j+2][0, :]])
 
-        c[j] = 2*np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j], Xs[j].T, ys[j]]).item()
-        c[j] -= 2*np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j+1], Xs[j+1].T, ys[j+1]]).item()
+        c[j] = np.dot(Xs[j+1][0, :], Xs_iy[j] - Xs_iy[j+1]).item()
 
-    Xs_i[m-1] = np.linalg.inv(np.dot(Xs[m-1].T, Xs[m-1])+mu[m-1] * np.identity(len(Xs[m-1][0, :])))
+    Xs_i[m-1] = np.linalg.inv(np.dot(Xs[m-1].T, Xs[m-1])+mu[m-1] * np.identity(Xs[m-1].shape[1]))
+    Xs_iy[m-1] = np.linalg.multi_dot([Xs_i[m-1], Xs[m-1].T, ys[m-1]])
 
     A[m-2][m-3] = A[m-3][m-2]
     A[m-2][m-2] = np.linalg.multi_dot([Xs[m-1][0, :], Xs_i[m-2] + Xs_i[m-1], Xs[m-1][0, :]])
-    c[m-2] = 2*np.linalg.multi_dot([Xs[m-1][0, :], Xs_i[m-2], Xs[m-2].T, ys[m-2]]).item()
-    c[m-2] -= 2*np.linalg.multi_dot([Xs[m-1][0, :], Xs_i[m-1], Xs[m-1].T, ys[m-1]]).item()
-    print(A)
-    print(c)
+
+    c[m-2] = np.dot(Xs[m-1][0, :], Xs_iy[m-2] - Xs_iy[m-1]).item()
+
     ab = np.zeros((3, m-1))
 
     for i in range(m-1):
@@ -87,15 +101,15 @@ def fit(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = None,
     L = scipy.linalg.solve_banded((1,1), ab, c)
 
     betas = []
-    betas.append(np.dot(Xs_i[0], np.dot(Xs[0].T, ys[0]).reshape((2, )) - L[0] * Xs[1][0, :] / 2))
+    betas.append(np.dot(Xs_i[0], np.dot(Xs[0].T, ys[0]).reshape((2, )) - L[0] * Xs[1][0, :]))
     for j in range(1, m-1):
-        _beta = np.dot(Xs[j].T, ys[j]).reshape((2, )) + L[j-1] * Xs[j][0, :] / 2 - L[j] * Xs[j+1][0, :] / 2
+        _beta = np.dot(Xs[j].T, ys[j]).reshape((2, )) + L[j-1] * Xs[j][0, :] - L[j] * Xs[j+1][0, :]
         betas.append(np.dot(Xs_i[j], _beta))
-    betas.append(np.dot(Xs_i[m-1], np.dot(Xs[m-1].T, ys[m-1]).reshape((2, )) + L[m-2] * Xs[m-1][0, :] / 2))
+    betas.append(np.dot(Xs_i[m-1], np.dot(Xs[m-1].T, ys[m-1]).reshape((2, )) + L[m-2] * Xs[m-1][0, :]))
 
     return betas
 
-def fit(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = None, mu: np.array = None):
+def fit_svd(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = None, mu: np.array = None):
     assert(len(Xs)==len(ys))
     # More assertions?
 
@@ -126,36 +140,42 @@ def fit(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = None,
     A = np.zeros((m-1,m-1))
     c = np.zeros(m-1)
 
-    Xs_i = []
-    
-    Xs_i[0] = np.linalg.inv(np.dot(Xs[0].T, Xs[0]) + mu[0]*np.identity(len(Xs[0][0, :])))
-    Xs_i[1] = np.linalg.inv(np.dot(Xs[1].T, Xs[1]) + mu[1]*np.identity(len(Xs[1][0, :])))
+    Us = []
+    Ss = []
+    Vs = []
 
-    A[0][0] = np.dot(Xs[1][0, :], np.dot(Xs_i[0] + Xs_i[1], Xs[1][0, :]))
+    Xs_i = {}
+    Xs_iy = {}
+
+    for i in range(len(Xs)):
+        u, s, vt = np.linalg.svd(Xs[i], 0)
+        v = vt.T
+        Us.append(u)
+        Ss.append(s)
+        Vs.append(v)
+
+        sd = s * s + mu[i]
+        vs = v / sd
+        Xs_i[i] = np.dot(vs, vt)
+        Xs_iy[i] = np.dot(vs * s, np.dot(u.T, ys[i]))
+
     A[0][0] = np.linalg.multi_dot([Xs[1][0, :], Xs_i[0] + Xs_i[1], Xs[1][0, :]])
     A[0][1] = -np.linalg.multi_dot([Xs[1][0, :], Xs_i[1], Xs[2][0, :]])
     
-    c[0] = 2*np.linalg.multi_dot([Xs[1][0, :], Xs_i[0], Xs[0].T, ys[0]]).item()
-    c[0] -= 2*np.linalg.multi_dot([Xs[1][0, :], Xs_i[1], Xs[1].T, ys[1]]).item()
+    c[0] = np.dot(Xs[1][0, :], Xs_iy[0] - Xs_iy[1]).item()
     
     for j in range(1, m-2):
-        Xs_i[j+1] = np.linalg.inv(np.dot(Xs[j+1].T, Xs[j+1]) + mu[j+1] * np.identity(len(Xs[j+1][0, :])))
-
         A[j][j-1] = A[j-1][j]
         A[j][j] = np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j] + Xs_i[j+1], Xs[j+1][0, :]])
         A[j][j+1] = -np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j+1], Xs[j+2][0, :]])
 
-        c[j] = 2*np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j], Xs[j].T, ys[j]]).item()
-        c[j] -= 2*np.linalg.multi_dot([Xs[j+1][0, :], Xs_i[j+1], Xs[j+1].T, ys[j+1]]).item()
-
-    Xs_i[m-1] = np.linalg.inv(np.dot(Xs[m-1].T, Xs[m-1])+mu[m-1] * np.identity(len(Xs[m-1][0, :])))
+        c[j] = np.dot(Xs[j+1][0, :], Xs_iy[j] - Xs_iy[j+1]).item()
 
     A[m-2][m-3] = A[m-3][m-2]
     A[m-2][m-2] = np.linalg.multi_dot([Xs[m-1][0, :], Xs_i[m-2] + Xs_i[m-1], Xs[m-1][0, :]])
-    c[m-2] = 2*np.linalg.multi_dot([Xs[m-1][0, :], Xs_i[m-2], Xs[m-2].T, ys[m-2]]).item()
-    c[m-2] -= 2*np.linalg.multi_dot([Xs[m-1][0, :], Xs_i[m-1], Xs[m-1].T, ys[m-1]]).item()
-    print(A)
-    print(c)
+
+    c[m-2] = np.dot(Xs[m-1][0, :], Xs_iy[m-2] - Xs_iy[m-1]).item()
+
     ab = np.zeros((3, m-1))
 
     for i in range(m-1):
@@ -168,35 +188,42 @@ def fit(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = None,
     L = scipy.linalg.solve_banded((1,1), ab, c)
 
     betas = []
-    betas.append(np.dot(Xs_i[0], np.dot(Xs[0].T, ys[0]).reshape((2, )) - L[0] * Xs[1][0, :] / 2))
+    betas.append(np.dot(Xs_i[0], np.dot(Xs[0].T, ys[0]).reshape((2, )) - L[0] * Xs[1][0, :]))
     for j in range(1, m-1):
-        _beta = np.dot(Xs[j].T, ys[j]).reshape((2, )) + L[j-1] * Xs[j][0, :] / 2 - L[j] * Xs[j+1][0, :] / 2
+        _beta = np.dot(Xs[j].T, ys[j]).reshape((2, )) + L[j-1] * Xs[j][0, :] - L[j] * Xs[j+1][0, :]
         betas.append(np.dot(Xs_i[j], _beta))
-    betas.append(np.dot(Xs_i[m-1], np.dot(Xs[m-1].T, ys[m-1]).reshape((2, )) + L[m-2] * Xs[m-1][0, :] / 2))
+    betas.append(np.dot(Xs_i[m-1], np.dot(Xs[m-1].T, ys[m-1]).reshape((2, )) + L[m-2] * Xs[m-1][0, :]))
 
     return betas
 
-
 df = pd.read_csv('test1.csv')[:1000].reset_index(drop=True)
-
 
 breakpoints = [450, 500, 550, 610, 666, 710, 827, 941, len(df)]
 
 Xs = []
 ys = []
 prev_break = 0
-
 for _break in breakpoints:
     Xs.append(sm.add_constant(np.array(list(map(lambda x: [x], df[' timeExp'][prev_break:_break])))))
     ys.append(np.array(list(map(lambda x: [x], df[' controller_x'][prev_break:_break]))))
     prev_break = _break
-mu = np.repeat(0, len(Xs))
+mu = np.repeat(1, len(Xs))
 
+start = time.time()
+for k in range(2000):
+    betas = fit(Xs, ys, weight_segments=True, mu = mu)
+print('Base', time.time()-start)
+
+
+start = time.time()
+for k in range(2000):
+    betas = fit_svd(Xs, ys, weight_segments=True, mu = mu)
+print('SVD', time.time()-start)
+
+"""
 plt.plot(df[' timeExp'], df[' controller_x'])
-
-betas = fit(Xs, ys, weight_segments=True, mu = mu)
-prev_break = 0
 for i, X in enumerate(Xs):
     plt.plot(X[:, 1], X.dot(betas[i]))
 
 plt.show()
+"""
