@@ -5,17 +5,6 @@ import scipy
 import statsmodels.api as sm
 import time
 
-"""
-class CSR_KB:
-
-    def __init__(self, endog, breakpoints, exog = None, weights = None):
-        self.exog = exog
-        self.breakpoints = breakpoints
-        self.endog = endog
-        self.weights = weights
-        if weights is not None:
-"""
-
 def whiten(Xs, ys, w: list = None, Ws: list = None):
     # Assertions?
     if w is None or Ws is None:
@@ -53,6 +42,11 @@ def fit(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = None,
         w = w/min(w)
 
     Xs, ys = whiten(Xs, ys, w, Ws)
+    temp_x = np.array([])
+    temp_y = np.array([])
+    for X, y in zip(Xs, ys):
+        temp_x = np.append(temp_x, X)
+        temp_y = np.append(temp_y, y)
 
     A = np.zeros((m-1,m-1))
     c = np.zeros(m-1)
@@ -140,19 +134,12 @@ def fit_svd(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = N
     A = np.zeros((m-1,m-1))
     c = np.zeros(m-1)
 
-    Us = []
-    Ss = []
-    Vs = []
-
     Xs_i = {}
     Xs_iy = {}
 
     for i in range(len(Xs)):
         u, s, vt = np.linalg.svd(Xs[i], 0)
         v = vt.T
-        Us.append(u)
-        Ss.append(s)
-        Vs.append(v)
 
         sd = s * s + mu[i]
         vs = v / sd
@@ -198,23 +185,29 @@ def fit_svd(Xs, ys, weight_segments: bool = False, w : list = None, Ws: list = N
 
 df = pd.read_csv('test1.csv')[:1000].reset_index(drop=True)
 
-breakpoints = [450, 500, 550, 610, 666, 710, 827, 941, len(df)]
+breakpoints = [0, 450, 500, 550, 610, 666, 710, 827, 941, len(df)]
 
 Xs = []
 ys = []
 prev_break = 0
-for _break in breakpoints:
+for _break in breakpoints[1:]:
     Xs.append(sm.add_constant(np.array(list(map(lambda x: [x], df[' timeExp'][prev_break:_break])))))
     ys.append(np.array(list(map(lambda x: [x], df[' controller_x'][prev_break:_break]))))
     prev_break = _break
 mu = np.repeat(1, len(Xs))
 
+w = np.arange(1, len(breakpoints))
+Ws = np.array([])
+for i in range(len(breakpoints)-1):
+    Ws = np.append(Ws, np.sqrt(range(breakpoints[i]+1, breakpoints[i+1]+1)))
+
 start = time.time()
-for k in range(2000):
-    betas = fit(Xs, ys, weight_segments=True, mu = mu)
+for k in range(1):
+    betas = fit(Xs, ys, w = w, Ws = w, mu = mu)
+    print(betas)
 print('Base', time.time()-start)
 
-
+"""
 start = time.time()
 for k in range(2000):
     betas = fit_svd(Xs, ys, weight_segments=True, mu = mu)
@@ -226,4 +219,3 @@ for i, X in enumerate(Xs):
     plt.plot(X[:, 1], X.dot(betas[i]))
 
 plt.show()
-"""
