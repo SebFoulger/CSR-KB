@@ -83,7 +83,7 @@ class CSR_KB:
                 XTX[i] = np.dot(vs, vt)
                 _beta[i] = np.dot(vs * s, np.dot(u.T, y))
 
-            betas = self._calculate_betas(XTX, _beta)
+            kwargs = {'XTX': XTX}
 
         elif method == 'normal':
             
@@ -94,7 +94,7 @@ class CSR_KB:
                 XTX[i] = np.linalg.inv(np.dot(X.T, X))
                 _beta[i] = np.linalg.multi_dot([XTX[i], X.T, y])
 
-            betas = self._calculate_betas(XTX, _beta)
+            kwargs = {'XTX': XTX}
 
         elif method == 'qr':
 
@@ -119,40 +119,12 @@ class CSR_KB:
                 _XTX_x2 = scipy.linalg.solve_triangular(R[i+1].T, x, lower = True)
                 XTX_x2[i+1] = scipy.linalg.solve_triangular(R[i+1], _XTX_x2)
 
-            A = np.zeros((m - 1, m - 1))
-            c = np.zeros(m - 1)
+            kwargs = {'XTX_x1': XTX_x1, 'XTX_x2': XTX_x2}
 
-            A[0][0] = np.dot(self.wexog_init[1], XTX_x1[0] + XTX_x2[1])
-            A[0][1] = -np.dot(self.wexog_init[1], XTX_x1[1])
-            
-            c[0] = np.dot(self.wexog_init[1], _beta[0] - _beta[1]).item()
+        else:
+            raise ValueError('method has to be "svd", "normal", or "qr"')
 
-            for j in range(1, m - 2):
-
-                A[j][j-1] = A[j-1][j]
-                A[j][j] = np.dot(self.wexog_init[j+1], XTX_x1[j] + XTX_x2[j+1])
-                A[j][j+1] = -np.dot(self.wexog_init[j+1], XTX_x1[j+1])
-
-                c[j] = np.dot(self.wexog_init[j+1], _beta[j] - _beta[j+1]).item()
-
-            A[m-2][m-3] = A[m-3][m-2]
-            A[m-2][m-2] = np.dot(self.wexog_init[m-1], XTX_x1[m-2] + XTX_x2[m-1])
-
-            c[m-2] = np.dot(self.wexog_init[m-1], _beta[m-2] - _beta[m-1]).item()
-
-            ab = np.zeros((3, m-1))
-
-            for i in range(m-1):
-                for j in range(max(0, i-1), min([2+i, m-1])):
-                    ab[1+i-j, j] = A[i, j]
-            
-            L = scipy.linalg.solve_banded((1,1), ab, c)
-
-            betas = []
-            betas.append(_beta[0] - L[0] * XTX_x1[0])
-            for j in range(1, m-1):
-                betas.append(_beta[j] + L[j-1] * XTX_x2[j] - L[j] * XTX_x1[j])
-            betas.append(_beta[m-1] + L[m-2] * XTX_x2[m-1])
+        betas = self._calculate_betas(method = method, _beta = _beta, **kwargs)
         
         self.betas = betas
         return betas
@@ -189,47 +161,84 @@ class CSR_KB:
                 XTX[i] = np.linalg.inv(np.dot(X.T, X) + mu[i]*np.identity(X.shape[1]))
                 _beta[i] = np.linalg.multi_dot([XTX[i], X.T, y])
 
-        betas = self._calculate_betas(XTX, _beta)
+        else:
+            raise ValueError('method has to be "svd" or "normal"')
+
+
+        betas = self._calculate_betas(method = method, _beta = _beta, XTX = XTX)
         self.betas = betas
         return betas
 
-    def _calculate_betas(self, XTX, _beta):
+    def _calculate_betas(self, method, _beta, XTX = None, XTX_x1 = None, XTX_x2 = None):
         m = self.nsegs
 
         A = np.zeros((m - 1, m - 1))
         c = np.zeros(m - 1)
 
-        A[0][0] = np.linalg.multi_dot([self.wexog_init[1], XTX[0] + XTX[1], self.wexog_init[1]])
-        A[0][1] = -np.linalg.multi_dot([self.wexog_init[1], XTX[1], self.wexog_init[2]])
-        
-        c[0] = np.dot(self.wexog_init[1], _beta[0] - _beta[1]).item()
-        
-        for j in range(1, m - 2):
+        if method == 'qr':
+            A[0][0] = np.dot(self.wexog_init[1], XTX_x1[0] + XTX_x2[1])
+            A[0][1] = -np.dot(self.wexog_init[1], XTX_x1[1])
+            
+            c[0] = np.dot(self.wexog_init[1], _beta[0] - _beta[1]).item()
 
-            A[j][j-1] = A[j-1][j]
-            A[j][j] = np.linalg.multi_dot([self.wexog_init[j+1], XTX[j] + XTX[j+1], self.wexog_init[j+1]])
-            A[j][j+1] = -np.linalg.multi_dot([self.wexog_init[j+1], XTX[j+1], self.wexog_init[j+2]])
+            for j in range(1, m - 2):
 
-            c[j] = np.dot(self.wexog_init[j+1], _beta[j] - _beta[j+1]).item()
+                A[j][j-1] = A[j-1][j]
+                A[j][j] = np.dot(self.wexog_init[j+1], XTX_x1[j] + XTX_x2[j+1])
+                A[j][j+1] = -np.dot(self.wexog_init[j+1], XTX_x1[j+1])
 
-        A[m-2][m-3] = A[m-3][m-2]
-        A[m-2][m-2] = np.linalg.multi_dot([self.wexog_init[m-1], XTX[m-2] + XTX[m-1], self.wexog_init[m-1]])
+                c[j] = np.dot(self.wexog_init[j+1], _beta[j] - _beta[j+1]).item()
 
-        c[m-2] = np.dot(self.wexog_init[m-1], _beta[m-2] - _beta[m-1]).item()
+            A[m-2][m-3] = A[m-3][m-2]
+            A[m-2][m-2] = np.dot(self.wexog_init[m-1], XTX_x1[m-2] + XTX_x2[m-1])
 
-        ab = np.zeros((3, m-1))
+            c[m-2] = np.dot(self.wexog_init[m-1], _beta[m-2] - _beta[m-1]).item()
 
-        for i in range(m-1):
-            for j in range(max(0, i-1), min([2+i, m-1])):
-                ab[1+i-j, j] = A[i, j]
-        
-        L = scipy.linalg.solve_banded((1,1), ab, c)
+            ab = np.zeros((3, m-1))
 
-        betas = []
-        betas.append(_beta[0]-L[0] * XTX[0].dot(self.wexog_init[1]))
-        for j in range(1, m-1):
-            betas.append(_beta[j]+ XTX[j].dot(L[j-1] * self.wexog_init[j] - L[j] * self.wexog_init[j+1]))
-        betas.append(_beta[m-1]+L[m-2] * XTX[m-1].dot(self.wexog_init[m-1]))
+            for i in range(m-1):
+                for j in range(max(0, i-1), min([2+i, m-1])):
+                    ab[1+i-j, j] = A[i, j]
+            
+            L = scipy.linalg.solve_banded((1,1), ab, c)
+
+            betas = []
+            betas.append(_beta[0] - L[0] * XTX_x1[0])
+            for j in range(1, m-1):
+                betas.append(_beta[j] + L[j-1] * XTX_x2[j] - L[j] * XTX_x1[j])
+            betas.append(_beta[m-1] + L[m-2] * XTX_x2[m-1])
+        else:
+            A[0][0] = np.linalg.multi_dot([self.wexog_init[1], XTX[0] + XTX[1], self.wexog_init[1]])
+            A[0][1] = -np.linalg.multi_dot([self.wexog_init[1], XTX[1], self.wexog_init[2]])
+            
+            c[0] = np.dot(self.wexog_init[1], _beta[0] - _beta[1]).item()
+            
+            for j in range(1, m - 2):
+
+                A[j][j-1] = A[j-1][j]
+                A[j][j] = np.linalg.multi_dot([self.wexog_init[j+1], XTX[j] + XTX[j+1], self.wexog_init[j+1]])
+                A[j][j+1] = -np.linalg.multi_dot([self.wexog_init[j+1], XTX[j+1], self.wexog_init[j+2]])
+
+                c[j] = np.dot(self.wexog_init[j+1], _beta[j] - _beta[j+1]).item()
+
+            A[m-2][m-3] = A[m-3][m-2]
+            A[m-2][m-2] = np.linalg.multi_dot([self.wexog_init[m-1], XTX[m-2] + XTX[m-1], self.wexog_init[m-1]])
+
+            c[m-2] = np.dot(self.wexog_init[m-1], _beta[m-2] - _beta[m-1]).item()
+
+            ab = np.zeros((3, m-1))
+
+            for i in range(m-1):
+                for j in range(max(0, i-1), min([2+i, m-1])):
+                    ab[1+i-j, j] = A[i, j]
+            
+            L = scipy.linalg.solve_banded((1,1), ab, c)
+
+            betas = []
+            betas.append(_beta[0]-L[0] * XTX[0].dot(self.wexog_init[1]))
+            for j in range(1, m-1):
+                betas.append(_beta[j]+ XTX[j].dot(L[j-1] * self.wexog_init[j] - L[j] * self.wexog_init[j+1]))
+            betas.append(_beta[m-1]+L[m-2] * XTX[m-1].dot(self.wexog_init[m-1]))
 
         return betas
     
@@ -255,7 +264,7 @@ weights =  np.arange(1, len(Xs)+1)
 model = CSR_KB(ys, breakpoints, Xs, weights = weights, seg_weights = np.arange(1, len(breakpoints)))
 #betas = model.fit_regularized(mu = np.repeat(0, len(breakpoints)-1))
 
-betas = model.fit(method='qr')
+betas = model.fit(method='sdfsdf')
 Xs = []
 ys = []
 prev_break = 0
