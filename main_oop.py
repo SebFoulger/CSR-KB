@@ -63,13 +63,14 @@ class CSR_KB:
             return x
 
     def fit(self, 
-            method: Literal['svd', 'normal'] = 'svd'):
+            method: Literal['svd', 'qr', 'normal'] = 'svd'):
         XTX = {}
         _beta = {}
+        m = self.nsegs
 
         if method == 'svd':
 
-            for i in range(self.nsegs):
+            for i in range(m):
                 X = self.wexog[self.breakpoints[i]:self.breakpoints[i+1]]
                 y = self.wendog[self.breakpoints[i]:self.breakpoints[i+1]]
 
@@ -82,16 +83,77 @@ class CSR_KB:
                 XTX[i] = np.dot(vs, vt)
                 _beta[i] = np.dot(vs * s, np.dot(u.T, y))
 
+            betas = self._calculate_betas(XTX, _beta)
+
         elif method == 'normal':
             
-            for i in range(self.nsegs):
+            for i in range(m):
                 X = self.wexog[self.breakpoints[i]:self.breakpoints[i+1]]
                 y = self.wendog[self.breakpoints[i]:self.breakpoints[i+1]]
 
                 XTX[i] = np.linalg.inv(np.dot(X.T, X))
                 _beta[i] = np.linalg.multi_dot([XTX[i], X.T, y])
 
-        betas = self._calculate_betas(XTX, _beta)
+            betas = self._calculate_betas(XTX, _beta)
+
+        elif method == 'qr':
+
+            Q = {}
+            R = {}
+
+            for i in range(m):
+                X = self.wexog[self.breakpoints[i]:self.breakpoints[i+1]]
+                y = self.wendog[self.breakpoints[i]:self.breakpoints[i+1]]
+                Q[i], R[i] = np.linalg.qr(X)
+                _beta[i] = scipy.linalg.solve_triangular(R[i], np.dot(Q[i].T, y))
+
+            XTX_x1 = {}
+            XTX_x2 = {}
+
+            for i in range(m - 1):
+                x = self.wexog_init[i+1]
+
+                _XTX_x1 = scipy.linalg.solve_triangular(R[i].T, x, lower = True)
+                XTX_x1[i] = scipy.linalg.solve_triangular(R[i], _XTX_x1)
+
+                _XTX_x2 = scipy.linalg.solve_triangular(R[i+1].T, x, lower = True)
+                XTX_x2[i+1] = scipy.linalg.solve_triangular(R[i+1], _XTX_x2)
+
+            A = np.zeros((m - 1, m - 1))
+            c = np.zeros(m - 1)
+
+            A[0][0] = np.dot(self.wexog_init[1], XTX_x1[0] + XTX_x2[1])
+            A[0][1] = -np.dot(self.wexog_init[1], XTX_x1[1])
+            
+            c[0] = np.dot(self.wexog_init[1], _beta[0] - _beta[1]).item()
+
+            for j in range(1, m - 2):
+
+                A[j][j-1] = A[j-1][j]
+                A[j][j] = np.dot(self.wexog_init[j+1], XTX_x1[j] + XTX_x2[j+1])
+                A[j][j+1] = -np.dot(self.wexog_init[j+1], XTX_x1[j+1])
+
+                c[j] = np.dot(self.wexog_init[j+1], _beta[j] - _beta[j+1]).item()
+
+            A[m-2][m-3] = A[m-3][m-2]
+            A[m-2][m-2] = np.dot(self.wexog_init[m-1], XTX_x1[m-2] + XTX_x2[m-1])
+
+            c[m-2] = np.dot(self.wexog_init[m-1], _beta[m-2] - _beta[m-1]).item()
+
+            ab = np.zeros((3, m-1))
+
+            for i in range(m-1):
+                for j in range(max(0, i-1), min([2+i, m-1])):
+                    ab[1+i-j, j] = A[i, j]
+            
+            L = scipy.linalg.solve_banded((1,1), ab, c)
+
+            betas = []
+            betas.append(_beta[0] - L[0] * XTX_x1[0])
+            for j in range(1, m-1):
+                betas.append(_beta[j] + L[j-1] * XTX_x2[j] - L[j] * XTX_x1[j])
+            betas.append(_beta[m-1] + L[m-2] * XTX_x2[m-1])
+        
         self.betas = betas
         return betas
 
@@ -101,10 +163,11 @@ class CSR_KB:
 
         XTX = {}
         _beta = {}
+        m = self.nsegs
 
         if method == 'svd':
 
-            for i in range(self.nsegs):
+            for i in range(m):
                 X = self.wexog[self.breakpoints[i]:self.breakpoints[i+1]]
                 y = self.wendog[self.breakpoints[i]:self.breakpoints[i+1]]
 
@@ -119,7 +182,7 @@ class CSR_KB:
 
         elif method == 'normal':
             
-            for i in range(self.nsegs):
+            for i in range(m):
                 X = self.wexog[self.breakpoints[i]:self.breakpoints[i+1]]
                 y = self.wendog[self.breakpoints[i]:self.breakpoints[i+1]]
 
@@ -129,7 +192,6 @@ class CSR_KB:
         betas = self._calculate_betas(XTX, _beta)
         self.betas = betas
         return betas
-
 
     def _calculate_betas(self, XTX, _beta):
         m = self.nsegs
@@ -155,14 +217,12 @@ class CSR_KB:
 
         c[m-2] = np.dot(self.wexog_init[m-1], _beta[m-2] - _beta[m-1]).item()
 
-        print(is_pos_def(A))
-
         ab = np.zeros((3, m-1))
 
         for i in range(m-1):
             for j in range(max(0, i-1), min([2+i, m-1])):
                 ab[1+i-j, j] = A[i, j]
-
+        
         L = scipy.linalg.solve_banded((1,1), ab, c)
 
         betas = []
@@ -176,26 +236,26 @@ class CSR_KB:
 def is_pos_def(x):
     return np.linalg.eigvals(x)
 
-for k in range(100):
-    df = pd.read_csv('test1.csv')[k*1000:(k+1)*1000].reset_index(drop=True)
+df = pd.read_csv('test1.csv')[:1000].reset_index(drop=True)
 
-    breakpoints = [0, 450, 500, 550, 610, 666, 710, 827, 941, 1000]
+breakpoints = [0, 450, 500, 550, 610, 666, 710, 827, 941, 1000]
 
-    Xs = np.array([])
-    ys = np.array([])
-    prev_break = 0
-    for _break in breakpoints:
-        Xs = np.append(Xs, np.array(list(map(lambda x: [x], df[' timeExp'][prev_break:_break]))))
-        ys = np.append(ys, np.array(list(map(lambda x: [x], df[' controller_x'][prev_break:_break]))))
-        prev_break = _break
-    mu = np.repeat(1, len(Xs))
+Xs = np.array([])
+ys = np.array([])
+prev_break = 0
+for _break in breakpoints:
+    Xs = np.append(Xs, np.array(list(map(lambda x: [x], df[' timeExp'][prev_break:_break]))))
+    ys = np.append(ys, np.array(list(map(lambda x: [x], df[' controller_x'][prev_break:_break]))))
+    prev_break = _break
+mu = np.repeat(1, len(Xs))
 
-    Xs = sm.add_constant(Xs)
-    weights =  np.arange(1, len(Xs)+1)
+Xs = sm.add_constant(Xs)
+weights =  np.arange(1, len(Xs)+1)
 
-    model = CSR_KB(ys, breakpoints, Xs, weights = weights, seg_weights = np.arange(1, len(breakpoints)))
-    betas = model.fit_regularized(mu = np.repeat(0, len(breakpoints)-1))
+model = CSR_KB(ys, breakpoints, Xs, weights = weights, seg_weights = np.arange(1, len(breakpoints)))
+#betas = model.fit_regularized(mu = np.repeat(0, len(breakpoints)-1))
 
+betas = model.fit(method='qr')
 Xs = []
 ys = []
 prev_break = 0
