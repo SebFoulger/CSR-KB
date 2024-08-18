@@ -52,9 +52,23 @@ betas = model.fit_regularized(mu=mu, method=method)
 
 model.plot(...)
 ```
+Example plot:
+
+![example_plot](images/example_plot.png)
+
 The data is whitened upon instantiation of the CSR_KB object, but whitening of any ndarray can also be performed using the model weights as long as the ndarray has the same length as the endogenous (and exogenous) variable:
 ```python
 x_white = model.whiten(x)
 ```
 
 An example usage can be found in [example.ipynb](example.ipynb).
+
+## Methods
+
+There are currently four available methods for fitting the un-regularized model: 'normal', 'qr', 'qr2', 'svd'. Only 'normal' and 'svd' are implemented for the regularized model.
+* 'normal' solves for the closed-form solution with standard matrix and vector operations.
+* 'qr' uses the QR decomposition to avoid inverting any matrices, instead solving upper-triangular linear systems.
+* 'qr2' uses the QR decomposition to require only the inversion of upper-triangular matrices (the R component).
+* 'svd' uses the SVD decomposition to require only the inversion of diagonal matrices.
+
+Typically the ordering of effiency of the methods from best to worst is 'svd', 'qr2', 'qr', 'normal'.
