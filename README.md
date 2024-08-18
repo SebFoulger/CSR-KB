@@ -15,7 +15,9 @@ $$, X_j =
 -x_{j,1}-  \\
 \vdots \\
 -x_{j,s_j}-
-\end{bmatrix}, \boldsymbol{\beta}_j = 
+\end{bmatrix}$$
+
+$$, \boldsymbol{\beta}_j = 
 \begin{bmatrix}
 \beta_{j,1}  \\
 \vdots \\
