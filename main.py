@@ -159,7 +159,7 @@ class CSR_KB:
                 Q_, R_ = np.linalg.qr(X)
                 Q.append(Q_)
                 R.append(R_)
-                _beta.append(scipy.linalg.solve_triangular(R[i], np.dot(Q[i].T, y), check_finite = False))
+                _beta.append(scipy.linalg.solve_triangular(R_, np.dot(Q_.T, y), check_finite = False))
 
             # XTX_x1 will store (X[i].T @ X[i])^(-1) x[i+1] for each segment. See documentation for more details
             XTX_x1 = []
@@ -316,6 +316,9 @@ class CSR_KB:
             plot_breakpoints (bool, optional): set to True to plot breakpoints. Defaults to True.
         """ 
 
+        if self.exog_no_const.ndim != 1:
+            raise ValueError('Can only plot data with univariate exogenous variable.')
+
         if not plot_model and not plot_data:
             raise ValueError('Either plot_model or plot_data should be set to True.')
 
@@ -383,7 +386,6 @@ class CSR_KB:
                 raise ValueError(('"qr" has not been used to fit but is now attempting to be used for calculating') 
                                  ('betas. Ensure "qr" is selected in fit() if it\'s desired for _calculate_betas().'))
             # STEP 1: form linear equation, i.e. calculate matrix A and vector c. See documentation for more details.
-
             A[0][0] = np.dot(self.wexog_init[1], XTX_x1[0] + XTX_x2[0])
             A[0][1] = -np.dot(self.wexog_init[1], XTX_x1[1])
             
