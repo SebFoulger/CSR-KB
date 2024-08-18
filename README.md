@@ -3,7 +3,7 @@
 Continuous segmented regression with known breakpoints. 
 
 Say there are $m$ segments s.t. segment $j$ is intended to have linear regression $\by_j = \bX_j \bbeta_j$ and is of size $s_j$ where
-$$\by_j = \begin{pmatrix}
+$$\by_j = \begin{pmatrix}$$
 y_{j,1} \\
 \vdots \\
 y_{j,s_j}
