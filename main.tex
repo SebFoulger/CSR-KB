@@ -1,0 +1,366 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx, algpseudocode, algorithm, multirow, amsmath, amssymb, bm, caption, subcaption, setspace, geometry, amsthm, multirow, multicol, mathrsfs, adjustbox, cite}
+\usepackage[table]{xcolor}
+\definecolor{linkcolour}{HTML}{B6301C}
+\definecolor{citecolour}{HTML}{00A54F}
+\usepackage[colorlinks=true,linkcolor=linkcolour,citecolor=citecolour,urlcolor=citecolour]{hyperref}
+\usepackage[raggedrightboxes]{ragged2e}
+\usepackage{everypage}
+\usepackage[title]{appendix}
+\DeclareMathOperator{\N}{\mathcal{N}}
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator{\Prob}{\mathbb{P}}
+\DeclareMathOperator{\Var}{\text{Var}}
+\DeclareMathOperator{\bx}{\textbf{x}}
+\DeclareMathOperator{\bb}{\textbf{b}}
+\DeclareMathOperator{\bX}{\textbf{X}}
+\DeclareMathOperator{\by}{\textbf{y}}
+\DeclareMathOperator{\bY}{\textbf{Y}}
+\DeclareMathOperator{\bz}{\textbf{z}}
+\DeclareMathOperator{\bZ}{\textbf{Z}}
+\DeclareMathOperator{\bQ}{\textbf{Q}}
+\DeclareMathOperator{\bW}{\textbf{W}}
+\DeclareMathOperator{\bI}{\textbf{I}}
+\DeclareMathOperator{\bU}{\textbf{U}}
+\DeclareMathOperator{\bV}{\textbf{V}}
+\DeclareMathOperator{\bR}{\textbf{R}}
+\DeclareMathOperator{\ba}{\textbf{a}}
+\DeclareMathOperator{\bbeta}{\boldsymbol{\beta}}
+\DeclareMathOperator{\bSigma}{\mathbf{\Sigma}}
+\title{Continuous segmented regression with known breakpoints}
+\author{Sebastian Paul Rud Foulger}
+\date{June 2024}
+\doublespacing
+\geometry{margin=2cm}
+\newtheorem{defn}{Definition}
+\newtheorem{prop}{Proposition}
+\newtheorem{cor}{Corollary}
+\newtheorem*{remark}{Remark}
+
+\newcommand{\optionrule}{\noindent\rule{1.0\textwidth}{0.75pt}}
+
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+\begin{defn}[CSR-KB with weights]
+Say there are $m$ segments s.t. segment $j$ is intended to have linear regression $\by_j = \bX_j \bbeta_j$ and is of size $s_j$ where
+$$\by_j = \begin{pmatrix}
+y_{j,1} \\
+\vdots \\
+y_{j,s_j}
+\end{pmatrix}, \bX_j = 
+\begin{bmatrix}
+-\bx_{j,1}-  \\
+\vdots \\
+-\bx_{j,s_j}-
+\end{bmatrix}, \boldsymbol{\beta}_j = 
+\begin{bmatrix}
+\beta_{j,1}  \\
+\vdots \\
+\beta_{j,d}
+\end{bmatrix}.$$
+Then the continuous segmented regression problem with known breakpoints (CSR-KB) and weights is
+$$\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j\sum_{i=1}^{s_j} w_{ji}(y_{j, i}-\bx_{j, i}^T\bbeta_j)^2 = \min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j (\by_j-\bX_j\bbeta_j)^T\bW_j(\by_j-\bX_j\bbeta_j)$$
+such that
+$$\bx_{j, 1}^T \bbeta_j = \bx_{j, 1}^T \bbeta_{j-1}, \text{ for }j=2, ..., m.$$
+The regression weights are given by $w_{ji} > 0$ for $j\in \{1, ..., m\}, i \in \{1, ..., s_j\}$, $\bW_j = \text{diag}(w_{j1}, ..., w_{js_j})$. The segment weights are given by $w'_j > 0$ for $j \in \{1, ..., m\}$. Note that the segment weights could've been implemented through the regression weights, but for ease of use, these have been separated. 
+\end{defn}
+\begin{prop}[] \label{prop:convert}
+CSR-KB with weights can be converted to a CSR-KB problem without weights.
+\end{prop}
+\begin{proof}
+Let
+$$\bX'_j := \sqrt{w'_j} \cdot \text{diag}\left(\sqrt{w_{j1}}, ..., \sqrt{w_{js_j}}\right)\bX_j$$
+$$\by'_j := \sqrt{w'_j} \cdot \text{diag}\left(\sqrt{w_{j1}}, ..., \sqrt{w_{js_j}}\right)\by_j$$
+for $j \in \{1, ..., m\}$. Then
+$$\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j\sum_{i=1}^{s_j} w_{ji}(y_{j, i}-\bx_{j, i}^T\bbeta_j)^2 $$
+$$=\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m \sum_{i=1}^{s_j} \left(\sqrt{w'_j w_{j,i}} \cdot y_{j, i}-\sqrt{w'_j w_{j,i}} \cdot \bx_{j, i}^T\bbeta_j \right)^2 $$
+$$=\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m \sum_{i=1}^{s_j} \left(y'_{j, i}- \cdot \bx_{j, i}'^T\bbeta_j \right)^2=\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m (\by'_j-\bX'_j\bbeta_j)^T(\by'_j-\bX'_j\bbeta_j).$$
+The constraints for $j=2, ..., m$ satisfy
+$$\bx_{j, 1}^T \bbeta_j = \bx_{j, 1}^T \bbeta_{j-1}$$
+$$\iff \sqrt{w'_j w_{j,1}} \cdot \bx_{j, 1}^T \bbeta_j = \sqrt{w'_j w_{j,1}} \cdot \bx_{j, 1}^T \bbeta_{j-1} $$
+$$\iff \bx_{j, 1}'^T \bbeta_j = \bx_{j, 1}'^T \bbeta_{j-1}.$$
+\end{proof}
+\begin{remark}
+We only need to solve CSR-KB without weights by using the above whitening process.
+\end{remark}
+\begin{prop} \label{prop:main}
+CSR-KB has a closed-form solution. 
+\end{prop}
+\begin{proof}
+We will use the method of Lagrange multipliers.
+$$\Lambda(\bbeta_1,...,\bbeta_m,\lambda_2,...,\lambda_m) =  \sum_{j=1}^m (\by_j-\bX_j\bbeta_j)^T(\by_j-\bX_j\bbeta_j)-\sum_{j=2}^m\lambda_j\bx_{j, 1}^T (\bbeta_j - \bbeta_{j-1}).$$
+$$\frac{\partial \Lambda}{\partial \bbeta_j} = \begin{cases}
+2(\bX_1^T  \bX_1)\bbeta_1 - 2\bX_1^T  \by_1 +\lambda_{2}\bx_{2, 1} & j=1 \\
+2(\bX_j^T  \bX_j)\bbeta_j - 2\bX_j^T  \by_j - \lambda_j\bx_{j, 1}+\lambda_{j+1}\bx_{j+1, 1} & 2 \leq j \leq m-1 \\
+2(\bX_m^T \bX_m)\bbeta_m - 2\bX_m^T \by_m - \lambda_m\bx_{m, 1} & j=m.
+\end{cases}$$
+Solving these equal to $0$ yields
+\begin{equation} \label{eqn:beta}
+\bbeta_j=\begin{cases}
+(\bX_1^T  \bX_1)^{-1}(\bX_1^T \by_1 -\frac{\lambda_{2}}{2}\bx_{2, 1}) & j=1 \\
+(\bX_j^T  \bX_j)^{-1}(\bX_j^T \by_j + \frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
+(\bX_m^T \bX_m)^{-1}(\bX_m^T \by_m + \frac{\lambda_m}{2}\bx_{m, 1}) & j=m.
+\end{cases}
+\end{equation}
+We will solve for $\boldsymbol{\lambda}'=\frac{\boldsymbol{\lambda}}{2}$. Using the constraints, we get the equations
+$$\bx_{2,1}^T(\bX_1^T  \bX_1)^{-1}\left(\bX_1^T \by_1 -\lambda'_{2}\bx_{2, 1}\right)=\bx_{2,1}^T(\bX_2^T  \bX_2)^{-1}\left(\bX_2^T\by_2 + \lambda'_{2}\bx_{2, 1}-\lambda'_{3}\bx_{3, 1}\right) $$
+$$\iff \lambda'_{2}\left(\bx_{2,1}^T(\bX_1^T \bX_1)^{-1}\bx_{2, 1}+\bx_{2,1}^T(\bX_2^T \bX_2)^{-1}\bx_{2, 1} \right) + \lambda'_3\left(-\bx_{2,1}^T(\bX_2^T \bX_2)^{-1}\bx_{3, 1} \right) $$
+$$=\bx_{2,1}^T(\bX_1^T  \bX_1)^{-1}\bX_1^T \by_1-\bx_{2,1}^T(\bX_2^T  \bX_2)^{-1}\bX_2^T \by_2.$$
+For $j=3, ..., m-1$ we have
+$$\bx_{j,1}^T(\bX_{j-1}^T  \bX_{j-1})^{-1}\left(\bX_{j-1}^T  \by_{j-1} + \lambda'_{j-1}\bx_{j-1, 1}-\lambda'_{j}\bx_{j, 1}\right)$$
+$$= \bx_{j,1}^T(\bX_j^T  \bX_j)^{-1}\left( \bX_j^T \by_j + \lambda'_{j}\bx_{j, 1} -\lambda'_{j+1}\bx_{j+1, 1}\right).$$
+\begin{align*} 
+\iff &  \lambda'_{j-1} \left(-\bx_{j,1}^T(\bX_{j-1}^T  \bX_{j-1})^{-1}\bx_{j-1, 1}\right) \\ 
+& +  \lambda'_j \left(\bx_{j,1}^T(\bX_{j-1}^T  \bX_{j-1})^{-1}\bx_{j, 1}+\bx_{j,1}^T(\bX_j^T  \bX_j)^{-1}\bx_{j, 1}\right) \\
+& +  \lambda'_{j+1}\left(-\bx_{j,1}^T(\bX_j^T  \bX_j)^{-1}\bx_{j+1, 1}\right) \\
+& =\bx_{j,1}^T(\bX_{j-1}^T  \bX_{j-1})^{-1}\bX_{j-1}^T\by_{j-1}-\bx_{j,1}^T(\bX_j^T  \bX_j)^{-1} \bX_j^T \by_j.
+\end{align*}
+And finally
+$$\bx_{m,1}^T(\bX_{m-1}^T  \bX_{m-1})^{-1}\left(\bX_{m-1}^T \by_{m-1} + \lambda'_{m-1}\bx_{m-1, 1}-\lambda'_{m}\bx_{m, 1}\right) $$
+$$= \bx_{m,1}^T(\bX_m^T  \bX_m)^{-1} \left( \bX_m^T \by_m + \lambda'_{m}\bx_{m, 1} \right).$$
+\begin{align*}
+\iff & \lambda'_{m-1}\left(-\bx_{m,1}^T(\bX_{m-1}^T  \bX_{m-1})^{-1}\bx_{m-1, 1}\right) \\
+& + \lambda'_m\left(\bx_{m,1}^T(\bX_{m-1}^T  \bX_{m-1})^{-1}\bx_{m, 1}+\bx_{m,1}^T(\bX_m^T \bX_m)^{-1}\bx_{m, 1} \right) \\
+& = \bx_{m,1}^T(\bX_{m-1}^T  \bX_{m-1})^{-1}\bX_{m-1}^T \by_{m-1}-\bx_{m,1}^T(\bX_m^T \bX_m)^{-1}\bX_m^T\by_m.
+\end{align*}
+This can be represented as 
+$$\mathbf{A} \boldsymbol{\lambda}'=\mathbf{c}$$
+where $\mathbf{A}$ is tri-diagonal. Note that $\mathbf{A}_{j, j-1}=\mathbf{A}_{j-1,j}$ and so $\mathbf{A}^T=\mathbf{A}$. Solving for $\boldsymbol{\lambda}'$ and plugging in to Equation \ref{eqn:beta} yields the solution.
+\end{proof}
+\begin{remark}
+The solution for $\bbeta_j$ can be written as
+$$\bbeta_j=\begin{cases}
+(\bX_1^T  \bX_1)^{-1}\bX_1^T \by_1 -\frac{\lambda_{2}}{2}(\bX_1^T  \bX_1)^{-1}\bx_{2, 1} & j=1 \\
+(\bX_j^T  \bX_j)^{-1}\bX_j^T \by_j + (\bX_j^T  \bX_j)^{-1}(\frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
+(\bX_m^T \bX_m)^{-1}\bX_m^T \by_m + \frac{\lambda_m}{2}(\bX_m^T \bX_m)^{-1}\bx_{m, 1} & j=m.
+\end{cases}$$
+Since $(\bX_j^T  \bX_j)^{-1}$ and $(\bX_j^T  \bX_j)^{-1}\bX_j^T \by_j$ will have already been calculated for each $j$ to calculate $\boldsymbol{\lambda}'$, writing the solution in this form allows for efficient calculation of $\bbeta_j$.
+\end{remark}
+
+
+
+
+
+
+
+\begin{prop}[QR solution 1] There is a method that uses (reduced) QR decomposition and produces an equivalent solution for the CSR-KB problem.
+\end{prop}
+\begin{proof}
+Write
+$$\bX_j = \bQ_j \bR_j, j=1, ..., m$$
+where $\bQ_j^T\bQ_j = \bI$ and $\bR_j$ is upper-triangular. Then
+$$\bX_j^T \bX_j = \bR_j^T \bQ_j^T\bQ_j \bR_j = \bR_j^T\bR_j .$$
+Hence to find 
+$$(\bX_j^T \bX_j)^{-1} \ba$$
+for some vector $\ba$, it suffices to solve
+$$\bR_j^T \bR_j \bb = \ba$$
+for $\bR_j \bb$, which can then be solved for $\bb$. \\
+Similarly
+$$\bbeta_j := (\bX_j^T \bX_j)^{-1} \bX_j \by_j = (\bR_j^T \bR_j)^{-1} \bR_j^T \bQ_j^T \by_j$$
+$$\iff \bR_j^T \bR_j\bbeta_j = \bR_j^T \bQ_j^T \by_j$$
+$$\iff \bR_j\bbeta_j = \bQ_j^T \by_j$$
+So we can solve for $\bbeta_j$ using the fact $\bR_j$ is upper-triangular. Applying these two methods then yields an equivalent solution.
+\end{proof}
+
+\begin{remark}
+Since $\bR_j$ is upper triangular, solving equations with this matrix can be done efficiently.
+\end{remark}
+
+\begin{prop}[QR solution 2] There is a method that uses (reduced) QR decomposition and produces an equivalent solution for the CSR-KB problem, as long as the $\bR$ component of each decomposition is invertible.
+\end{prop}
+
+\begin{proof}
+Using the reduced QR decomposition, we have that 
+$$(\bX_j^T \bX_j)^{-1} = (\bR_j^T \bR_j)^{-1} = \bR_j^{-1} (\bR_j^{-1})^T$$
+since $\bR_j$ is invertible. Replacing every occurrence of $(\bX_j^T \bX_j)^{-1}$ with the above then yields an equivalent solution.
+\end{proof}
+
+\begin{remark}
+The benefit of this approach is that upper triangular matrices can be inverted more efficiently.
+\end{remark}
+
+\begin{defn}[CSR-KB with weights and regularisation]
+The CSR-KB problem with weights, regularisation function 
+$$\mathcal{R} : \left(\prod_{j=1}^m \mathbb{R}^{s_j} \right) \times \mathbb{R}^p \to \mathbb{R},$$
+and parameters $\mu_j$ for $1 \leq j \leq p$ is
+$$\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j\sum_{i=1}^{s_j} w_{ji}(y_{j, i}-\bx_{j, i}^T\bbeta_j)^2+\mathcal{R}(\bbeta_1, ..., \bbeta_m, \mu_1, ..., \mu_p)$$
+$$= \min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j (\by_j-\bX_j\bbeta_j)^T\bW_j(\by_j-\bX_j\bbeta_j)+\mathcal{R}(\bbeta_1, ..., \bbeta_m, \mu_1, ..., \mu_p)$$
+such that
+$$\bx_{j, 1}^T \bbeta_j = \bx_{j, 1}^T \bbeta_{j-1}, \text{ for }j=2, ..., m.$$
+\end{defn}
+\begin{prop}
+CSR-KB with weights and regularisation can be converted to a CSR-KB problem with regularisation and without weights.
+\end{prop}
+\begin{proof}
+Using the same data transformation as in \ref{prop:convert}, the objective function is transformed the same. The regularisation term is unchanged.
+\end{proof}
+
+\begin{prop}
+CSR-KB with weights and $L_2$ regularisation has a closed-form solution. Specifically, $L_2$ regularisation utilises 
+$$\mathcal{R}_2(\bbeta_1, ..., \bbeta_m, \mu_1, ..., \mu_m) := \sum_{j=1}^m \mu_j \bbeta_j^T\bbeta_j.$$
+\end{prop}
+\begin{proof}
+Again Lagrange multipliers are used, and WLOG, we assume the data has been transformed so there are no weights. $\Lambda(\bbeta_1,...,\bbeta_m,\lambda_2,...,\lambda_m)$ is given by
+$$\sum_{j=1}^m (\by_j-\bX_j\bbeta_j)^T(\by_j-\bX_j\bbeta_j)+\sum_{j=1}^m \mu_j \bbeta_j^T\bbeta_j-\sum_{j=2}^m\lambda_j\bx_{j, 1}^T (\bbeta_j - \bbeta_{j-1}).$$
+Then
+$$\frac{\partial \Lambda}{\partial \bbeta_j} = \begin{cases}
+2(\bX_1^T  \bX_1)\bbeta_1 - 2\bX_1^T \by_1 + 2\mu_1\bbeta_1 +\lambda_{2}\bx_{2, 1} & j=1 \\
+2(\bX_j^T  \bX_j)\bbeta_j - 2\bX_j^T  \by_j + 2\mu_j\bbeta_j - \lambda_j\bx_{j, 1}+\lambda_{j+1}\bx_{j+1, 1} & 2 \leq j \leq m-1 \\
+2(\bX_m^T \bX_m)\bbeta_m - 2\bX_m^T \by_m + 2\mu_m\bbeta_m  - \lambda_m\bx_{m, 1} & j=m.
+\end{cases}$$
+Solving these equal to $0$ yields
+$$\bbeta_j=\begin{cases}
+\left(\bX_1^T  \bX_1+\mu_1I\right)^{-1}(\bX_1^T \by_1 -\frac{\lambda_{2}}{2}\bx_{2, 1}) & j=1 \\
+\left(\bX_j^T  \bX_j+\mu_jI \right)^{-1}(\bX_j^T \by_j + \frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
+\left(\bX_m^T \bX_m+\mu_mI\right)^{-1}(\bX_m^T \by_m + \frac{\lambda_m}{2}\bx_{m, 1}) & j=m.
+\end{cases}$$
+The proof from here will be equivalent to the proof of Proposition \ref{prop:main} but with each occurrence of $\left(\bX_j^T  \bX_j \right)^{-1}$ replaced with $\left(\bX_j^T \bX_j+\mu_jI \right)^{-1}$.
+\end{proof}
+\begin{prop}[SVD solution]
+When $s_j \geq d$ for all $1 \leq j \leq m$, there is a method that uses Singular Value Decomposition (SVD) and produces an equivalent solution for the CSR-KB problem with regularisation, as long as the $\bV$ component of each decomposition is invertible.
+\end{prop}
+\begin{proof}
+For each $j$ we can write 
+$$\bX_j = \bU_j\bSigma_j \bV_j^T$$
+where $\bU_j$ is $s_j \times d$, $\bSigma$ is $d \times d$, and $\bV_j$ is $d \times d$. Also $\bU_j^T \bU_j = \bV_j^T \bV_j = \bI_d$ and $\bSigma_j$ is diagonal. Since $\bV_j$ is invertible (by assumption), $\bV_j^T \bV_j = \bI_d \implies \bV_j^T=(\bV_j)^{-1}$. Then 
+$$(\bX_j^T \bX_j+\mu_j\bI_d)^{-1} = (\bV_j \bSigma_j^T \bU_j^T \bU_j \bSigma_j \bV_j^T+\mu_j\bI_d)^{-1} = (\bV_j \bSigma_j^2 \bV_j^T+\mu_j\bI_d)^{-1}$$
+$$=(\bV_j \bSigma_j^2 \bV_j^T+\mu_j\bV_j \bV_j^T)^{-1}$$
+$$=((\bV_j^T)^{-1} \bSigma_j^2 \bV_j^{-1}+\mu_j(\bV_j^T)^{-1}\bV_j^{-1})^{-1}$$
+$$=((\bV_j^T)^{-1} (\bSigma_j^2+\mu_j\bI_d)\bV_j^{-1})^{-1}$$
+$$= \bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T.$$
+Then 
+$$(\bX_j^T \bX_j+\mu_j\bI_d)^{-1}\bX_j^T = \bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T \bV_j \bSigma_j^T \bU_j^T$$
+$$=\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1} \bSigma_j \bU_j^T.$$
+Using these in the equations for $\boldsymbol{\lambda}'$ yields
+$$\lambda'_{2}\left(\bx_{2,1}^T(\bV_1(\bSigma_1^2+\mu_1\bI_d)^{-1}\bV_1^T+\bV_2(\bSigma_2^2+\mu_2\bI_d)^{-1}\bV_2^T)\bx_{2, 1} \right) + \lambda'_3\left(-\bx_{2,1}^T\bV_3(\bSigma_3^2+\mu_3\bI_d)^{-1}\bV_3^T\bx_{3, 1} \right) $$
+$$=\bx_{2,1}^T\bV_1(\bSigma_1^2+\mu_1\bI_d)^{-1}\bSigma_1 \bU_1^T \by_1-\bx_{2,1}^T\bV_2(\bSigma_2^2+\mu_2\bI_d)^{-1}\bSigma_2 \bU_2^T \by_2.$$
+For $j=3, ..., m-1$
+\begin{align*} 
+\iff &  \lambda'_{j-1} \left(-\bx_{j,1}^T\bV_{j-1}(\bSigma_{j-1}^2+\mu_{j-1}\bI_d)^{-1}\bV_{j-1}^T\bx_{j-1, 1}\right) \\ 
+& +  \lambda'_j \left(\bx_{j,1}^T(\bV_{j-1}(\bSigma_{j-1}^2+\mu_{j-1}\bI_d)^{-1}\bV_{j-1}^T+\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T)\bx_{j, 1}\right) \\
+& +  \lambda'_{j+1}\left(-\bx_{j,1}^T\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T\bx_{j+1, 1}\right) \\
+& =\bx_{j,1}^T\bV_{j-1}(\bSigma_{j-1}^2+\mu_{j-1}\bI_d)^{-1}\bSigma_{j-1} \bU_{j-1}^T\by_{j-1}-\bx_{j,1}^T \bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1} \bSigma_j \bU_j^T \by_j.
+\end{align*}
+And finally
+\begin{align*}
+& \lambda'_{m-1}\left(-\bx_{m,1}^T\bV_{m-1}(\bSigma_{m-1}^2+\mu_{m-1}\bI_d)^{-1}\bV_{m-1}^T\bx_{m-1, 1}\right) \\
+& + \lambda'_m\left(\bx_{m,1}^T(\bV_{m-1}(\bSigma_{m-1}^2+\mu_{m-1}\bI_d)^{-1}\bV_{m-1}^T+\bV_{m}(\bSigma_{m}^2+\mu_{m}\bI_d)^{-1}\bV_{m}^T)\bx_{m, 1} \right) \\
+& = \bx_{m,1}^T\bV_{m-1}(\bSigma_{m-1}^2+\mu_{m-1}\bI_d)^{-1}\bSigma_{m-1} \bU_{m-1}^T \by_{m-1}-\bx_{m,1}^T\bV_{m}(\bSigma_{m}^2+\mu_{m}\bI_d)^{-1}\bSigma_m \bU_m^T\by_m.
+\end{align*}
+Substituting into the solution for $\bbeta_j$ yields
+\begin{equation} \label{eqn:beta_svd}
+\bbeta_j=\begin{cases}
+\bV_1(\bSigma_1^2+\mu_1\bI_d)^{-1}(\bSigma_1 \bU_1^T \by_1 -\frac{\lambda_{2}}{2}\bV_1^T\bx_{2, 1}) & j=1 \\
+\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}(\bSigma_j \bU_j^T \by_j + \bV_j^T(\frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1})) & 2 \leq j \leq m-1 \\
+\bV_m(\bSigma_m^2+\mu_m\bI_d)^{-1}(\bSigma_m \bU_m^T \by_m + \frac{\lambda_m}{2}\bV_m^T\bx_{m, 1}) & j=m. \end{cases}
+\end{equation}
+\end{proof}
+\begin{remark}
+The primary benefit of this approach is that 
+$$\bSigma_j^2+\mu_j\bI_d$$
+is diagonal for all $j$, so inverting it is easy to compute in linear time. Additionally, its inverse and all the $\bSigma_j$ are diagonal, which means multiplying with these can be computed in quadratic time (as opposed to cubic). Also, as was mentioned in the original solution, $\bbeta_j$ can be written as 
+$$\bbeta_j=\begin{cases}
+\bV_1(\bSigma_1^2+\mu_1\bI_d)^{-1}\bSigma_1 \bU_1^T \by_1 -\frac{\lambda_{2}}{2}\bV_1(\bSigma_1^2+\mu_1\bI_d)^{-1}\bV_1^T\bx_{2, 1}) & j=1 \\
+\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bSigma_j \bU_j^T \by_j + \bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T(\frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
+\bV_m(\bSigma_m^2+\mu_m\bI_d)^{-1}\bSigma_m \bU_m^T \by_m + \frac{\lambda_m}{2}\bV_m(\bSigma_m^2+\mu_m\bI_d)^{-1}\bV_m^T\bx_{m, 1} & j=m. \end{cases}$$
+Since $\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bSigma_j \bU_j^T \by_j$ and $\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T$ will have already been calculated, $\bbeta_j$ can be calculated efficiently.
+\end{remark}
+
+\begin{prop}
+MINIMUM. KKT?
+\end{prop}
+
+\begin{prop}
+TIME COMPLEXITY. \\
+Continuous segmented regression with known breakpoints has a closed-form solution which can be calculated in $O(d^2(n+d))$ where $n$ is the number of observations and $d$ is the dimension of the independent variables.
+\end{prop}
+\begin{proof}
+The solution to this (assuming $\mathbf{A}$ is non-singular) can be found in $O(m)$ time \cite{tridiagonal}. \\ \\
+For the time complexity, the longest calculations that need to be completed are the calculations of $(\bX_j^T\bX_j)^{-1}$ for each $j$. These have time complexity $O(s_jd^2)$ for the multiplication and $O(d^3)$ for the inversion. This has to be done a constant number of times for each $j$, so the time complexity for these operations is $O(d^3+d^2\sum_{j=1}^ms_j) = O(d^3+d^2n)$ since $n=\sum_{j=1}^m s_j$. All other operations are $O(d^2)$, and there is $O(m)$ of these, so the overall time complexity is 
+$$O(d^3+d^2n).$$
+\end{proof}
+
+\begin{prop}
+Multiplying weights by a positive constant yields the same optimal segment gradients.
+\end{prop}
+\begin{proof}
+Multiply all weights by $c>0$
+$$\Lambda(\bbeta_1,...,\bbeta_m,\lambda_2,...,\lambda_m) =  \sum_{j=1}^m cw'_j||\by_j-\bX_j\bbeta_j||^2-\sum_{j=2}^m\lambda_j\bx_{j, 1}^T (\bbeta_j - \bbeta_{j-1})$$
+$$=c\left(\sum_{j=1}^m w'_j||\by_j-\bX_j\bbeta_j||^2-\sum_{j=2}^m\frac{\lambda_j}{c}\bx_{j, 1}^T (\bbeta_j - \bbeta_{j-1} \right)$$
+$$=:c\Lambda' \left(\bbeta_1,...,\bbeta_m,\frac{\lambda_2}{c},...,\frac{\lambda_m}{c}\right).$$
+Thus 
+$$\frac{\partial \Lambda(\bbeta_1,...,\bbeta_m,\lambda_2,...,\lambda_m)}{\partial \bbeta_j} = 0$$
+$$\iff \frac{\partial \Lambda' \left(\bbeta_1,...,\bbeta_m,\lambda'_2,...,\lambda'_m \right)}{\partial \bbeta_j}=0.$$
+Where $\lambda'_i := \frac{\lambda_i}{c}$.
+Thus solving the Lagrange multiplier problem given by $\Lambda'$ yields the same optimal values $\bbeta^*_j$ as solving the problem given by $\Lambda$.
+\end{proof}
+
+\begin{prop}
+The predicted $\widehat{\by_j}$ values are invariant under scaling of the $\bX_j$.
+\end{prop}
+\begin{proof}
+$$\widehat{\by_j} = \bX_j \bbeta_j=\begin{cases}
+\bX_1(\bX_1^T  \bX_1)^{-1}(\bX_1^T \by_1 -\frac{\lambda_{2}}{2}\bx_{2, 1}) & j=1 \\
+\bX_j(\bX_j^T  \bX_j)^{-1}(\bX_j^T \by_j + \frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
+\bX_m(\bX_m^T \bX_m)^{-1}(\bX_m^T \by_m + \frac{\lambda_m}{2}\bx_{m, 1}) & j=m.
+\end{cases}$$
+Let $\bX'_j := a\bX_j$ with $a \neq 0$ and calculate $\bbeta'_j$. It is clear to see from the equations for $\boldsymbol{\lambda}$ that all the $a$ terms cancel out on either side of the equation. Then 
+$$\widehat{\by_j}' = \bX'_j \bbeta_j'=\begin{cases}
+\bX'_1(\bX_1'^T  \bX'_1)^{-1}(\bX_1'^T \by_1 -\frac{\lambda_{2}}{2}\bx'_{2, 1}) & j=1 \\
+\bX'_j(\bX_j'^T  \bX'_j)^{-1}(\bX_j'^T \by_j + \frac{\lambda_j}{2}\bx'_{j, 1}-\frac{\lambda_{j+1}}{2}\bx'_{j+1, 1}) & 2 \leq j \leq m-1 \\
+\bX'_m(\bX_m'^T \bX'_m)^{-1}(\bX_m'^T \by_m + \frac{\lambda_m}{2}\bx'_{m, 1}) & j=m.
+\end{cases}$$
+$$=\begin{cases}
+=a\bX_1(a\bX_1^T  a\bX_1)^{-1}(a\bX_1^T \by_1 -\frac{\lambda_{2}}{2}a\bx_{2, 1}) & j=1 \\
+a\bX_j(a\bX_j^T  a\bX_j)^{-1}(a\bX_j^T \by_j + \frac{\lambda_j}{2}a\bx_{j, 1}-\frac{\lambda_{j+1}}{2}a\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
+a\bX_m(a\bX_m^T a\bX_m)^{-1}(a\bX_m^T \by_m + \frac{\lambda_m}{2}a\bx_{m, 1}) & j=m.
+\end{cases}$$
+$$=\bX_j \bbeta_j = \widehat{\by_j}.$$
+\end{proof}
+
+\end{document}
+
+\begin{prop} \label{prop:main}
+CSR-KB with weights has a closed-form solution. 
+\end{prop}
+\begin{proof}
+We will use the method of Lagrange multipliers.
+$$\Lambda(\bbeta_1,...,\bbeta_m,\lambda_1,...,\lambda_m) =  \sum_{j=1}^m w'_j (\by_j-\bX_j\bbeta_j)^T\bW_j(\by_j-\bX_j\bbeta_j)-\sum_{j=2}^m\lambda_j\bx_{j, 1}^T (\bbeta_j - \bbeta_{j-1}).$$
+$$\frac{\partial \Lambda}{\partial \bbeta_j} = \begin{cases}
+2w'_1(\bX_1^T \bW_1 \bX_1)\bbeta_1 - 2w'_1\bX_1^T \bW_1 \by_1 +\lambda_{2}\bx_{2, 1} & j=1 \\
+2w'_j(\bX_j^T \bW_j \bX_j)\bbeta_j - 2w'_j\bX_j^T \bW_j \by_j - \lambda_j\bx_{j, 1}+\lambda_{j+1}\bx_{j+1, 1} & 2 \leq j \leq m-1 \\
+2w'_m(\bX_m^T \bW_m \bX_m)\bbeta_m - 2w'_m\bX_m^T \bW_m \by_m - \lambda_m\bx_{m, 1} & j=m.
+\end{cases}$$
+Solving these equal to $0$ yields
+$$\bbeta_j=\begin{cases}
+(\bX_1^T \bW_1 \bX_1)^{-1}(\bX_1^T \bW_1\by_1 -\frac{\lambda_{2}}{2w'_1}\bx_{2, 1}) & j=1 \\
+(\bX_j^T \bW_j \bX_j)^{-1}(\bX_j^T \bW_j\by_j + \frac{\lambda_j}{2w'_j}\bx_{j, 1}-\frac{\lambda_{j+1}}{2w'_j}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
+(\bX_m^T \bW_m\bX_m)^{-1}(\bX_m^T \bW_m\by_m + \frac{\lambda_m}{2w'_m}\bx_{m, 1}) & j=m.
+\end{cases}$$
+Using the constraints, we get the equations
+$$\bx_{2,1}^T(\bX_1^T \bW_1 \bX_1)^{-1}\left(\bX_1^T \bW_1\by_1 -\frac{\lambda_{2}}{2w'_1}\bx_{2, 1}\right)=\bx_{2,1}^T(\bX_2^T \bW_2 \bX_2)^{-1}\left(\bX_2^T \bW_2\by_2 + \frac{\lambda_{2}}{2w'_2}\bx_{2, 1}-\frac{\lambda_{3}}{2w'_2}\bx_{3, 1}\right) $$
+$$\iff \lambda_{2}\left(\frac{\bx_{2,1}^T(\bX_1^T \bW_1\bX_1)^{-1}\bx_{2, 1}}{w'_1}+\frac{\bx_{2,1}^T(\bX_2^T \bW_2 \bX_2)^{-1}\bx_{2, 1}}{w'_2} \right) + \lambda_3\left(-\frac{\bx_{2,1}^T(\bX_2^T \bW_2\bX_2)^{-1}\bx_{3, 1}}{w'_2} \right) $$
+$$=2\bx_{2,1}^T(\bX_1^T \bW_1 \bX_1)^{-1}\bX_1^T \bW_1\by_1-2\bx_{2,1}^T(\bX_2^T \bW_2 \bX_2)^{-1}\bX_2^T \bW_2\by_2.$$
+For $j=3, ..., m-1$ we have
+$$\bx_{j,1}^T(\bX_{j-1}^T \bW_{j-1} \bX_{j-1})^{-1}\left(\bX_{j-1}^T \bW_{j-1} \by_{j-1} + \frac{\lambda_{j-1}}{2w'_{j-1}}\bx_{j-1, 1}-\frac{\lambda_{j}}{2w'_{j-1}}\bx_{j, 1}\right)$$
+$$= \bx_{j,1}^T(\bX_j^T \bW_{j} \bX_j)^{-1}\left( \bX_j^T \bW_{j}\by_j + \frac{\lambda_{j}}{2w'_{j}}\bx_{j, 1} -\frac{\lambda_{j+1}}{2w'_{j}}\bx_{j+1, 1}\right).$$
+\begin{align*} 
+\iff &  \lambda_{j-1} \left(-\frac{\bx_{j,1}^T(\bX_{j-1}^T \bW_{j-1} \bX_{j-1})^{-1}\bx_{j-1, 1}}{w'_{j-1}}\right) \\ 
+& +  \lambda_j \left(\frac{\bx_{j,1}^T(\bX_{j-1}^T \bW_{j-1} \bX_{j-1})^{-1}\bx_{j, 1}}{w'_{j-1}}+\frac{\bx_{j,1}^T(\bX_j^T \bW_{j} \bX_j)^{-1}\bx_{j, 1}}{w'_j}\right) \\
+& +  \lambda_{j+1}\left(-\frac{\bx_{j,1}^T(\bX_j^T \bW_{j} \bX_j)^{-1}\bx_{j+1, 1}}{w'_{j}}\right) \\
+& =2\bx_{j,1}^T(\bX_{j-1}^T \bW_{j-1} \bX_{j-1})^{-1}\bX_{j-1}^T \bW_{j-1}\by_{j-1}-2\bx_{j,1}^T(\bX_j^T \bW_{j} \bX_j)^{-1} \bX_j^T \bW_{j}\by_j.
+\end{align*}
+And finally
+$$\bx_{m,1}^T(\bX_{m-1}^T \bW_{m-1} \bX_{m-1})^{-1}\left(\bX_{m-1}^T \bW_{m-1}\by_{m-1} + \frac{\lambda_{m-1}}{2w'_{m-1}}\bx_{m-1, 1}-\frac{\lambda_{m}}{2w'_{m-1}}\bx_{m, 1}\right) $$
+$$= \bx_{m,1}^T(\bX_m^T \bW_{m} \bX_m)^{-1} \left( \bX_m^T \bW_{m}\by_m + \frac{\lambda_{m}}{2w'_m}\bx_{m, 1} \right).$$
+\begin{align*}
+\iff & \lambda_{m-1}\left(-\frac{\bx_{m,1}^T(\bX_{m-1}^T \bW_{m-1} \bX_{m-1})^{-1}\bx_{m-1, 1}}{w'_{m-1}}\right) \\
+& + \lambda_m\left(\frac{\bx_{m,1}^T(\bX_{m-1}^T \bW_{m-1} \bX_{m-1})^{-1}\bx_{m, 1}}{w'_{m-1}}+\frac{\bx_{m,1}^T(\bX_m^T \bW_{m} \bX_m)^{-1}\bx_{m, 1}}{w'_m} \right) \\
+& = 2\bx_{m,1}^T(\bX_{m-1}^T \bW_{m-1} \bX_{m-1})^{-1}\bX_{m-1}^T \bW_{m-1}\by_{m-1}-2\bx_{m,1}^T(\bX_m^T \bW_{m}\bX_m)^{-1}\bX_m^T\bW_{m}\by_m.
+\end{align*}
+This can be represented as 
+$$\mathbf{A} \boldsymbol{\lambda}=\mathbf{c}$$
+where $\mathbf{A}$ is tri-diagonal.
+\end{proof}
