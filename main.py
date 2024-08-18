@@ -288,6 +288,63 @@ class CSR_KB:
         self.y_hat = y_hat
         return betas
 
+    def plot(self,
+             plot_model: bool = True,
+             plot_data: bool = True,
+             model_color: str = None,
+             data_color: str = None,
+             title: str = 'CSR-KB plot',
+             xlabel: str = None,
+             ylabel: str = None,
+             legend: bool = True,
+             model_label: str = 'Model',
+             data_label: str = 'Data',
+             plot_breakpoints: bool = True) -> None:
+        """Plot model and/or original data.
+
+        Args:
+            plot_model (bool, optional): set to True to plot model data. Defaults to True.
+            plot_data (bool, optional): set to True to plot original data. Defaults to True.
+            model_color (str, optional): color of model data line. Set to None for default color. Defaults to None.
+            data_color (str, optional): color of original data line. Set to None for default color. Defaults to None.
+            title (str, optional): title for plot. Defaults to 'CSR-KB plot'.
+            xlabel (str, optional): x-axis label for plot. Set to None for no label. Defaults to None.
+            ylabel (str, optional): y-axis label for plot. Set to None for no label. Defaults to None.
+            legend (bool, optional): set to True to include legend in plot. Defaults to True.
+            model_label (str, optional): model data line label. Defaults to 'Model'.
+            data_label (str, optional): original data line label. Defaults to 'Data'.
+            plot_breakpoints (bool, optional): set to True to plot breakpoints. Defaults to True.
+        """ 
+
+        if not plot_model and not plot_data:
+            raise ValueError('Either plot_model or plot_data should be set to True.')
+
+        fig, ax = plt.subplots() 
+
+        # Plot original data
+        if plot_data:
+            ax.plot(self.exog_no_const, self.endog, color=data_color, label=data_label)
+        # Check if betas have been calculated
+        if not hasattr(self, 'betas'):
+            if not plot_data:
+                raise ValueError('No data to plot. Neither fit nor fit_regularised have been called.')
+        else:
+            ax.plot(self.exog_no_const, self.y_hat, color=model_color, label=model_label)
+
+        if plot_breakpoints:
+            ax.axvline(x = self.exog_no_const[self.breakpoints[1]], color = 'r', linestyle='dashed', linewidth=1, 
+                       label='Breakpoints')
+            for break_ in self.breakpoints[2:-1]:
+                ax.axvline(x = self.exog_no_const[break_], color = 'r', linestyle='dashed', linewidth=1)
+
+        if legend:
+            ax.legend()
+
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.show()
+
     """Private Methods"""
 
     def _calculate_betas(self, 
@@ -402,63 +459,6 @@ class CSR_KB:
             betas.append(_beta[m-1]+L[m-2] * XTX[m-1].dot(self.wexog_init[m-1]))
 
         return betas
-
-    def plot(self,
-             plot_model: bool = True,
-             plot_data: bool = True,
-             model_color: str = None,
-             data_color: str = None,
-             title: str = 'CSR-KB plot',
-             xlabel: str = None,
-             ylabel: str = None,
-             legend: bool = True,
-             model_label: str = 'Model',
-             data_label: str = 'Data',
-             plot_breakpoints: bool = True) -> None:
-        """Plot model and/or original data.
-
-        Args:
-            plot_model (bool, optional): set to True to plot model data. Defaults to True.
-            plot_data (bool, optional): set to True to plot original data. Defaults to True.
-            model_color (str, optional): color of model data line. Set to None for default color. Defaults to None.
-            data_color (str, optional): color of original data line. Set to None for default color. Defaults to None.
-            title (str, optional): title for plot. Defaults to 'CSR-KB plot'.
-            xlabel (str, optional): x-axis label for plot. Set to None for no label. Defaults to None.
-            ylabel (str, optional): y-axis label for plot. Set to None for no label. Defaults to None.
-            legend (bool, optional): set to True to include legend in plot. Defaults to True.
-            model_label (str, optional): model data line label. Defaults to 'Model'.
-            data_label (str, optional): original data line label. Defaults to 'Data'.
-            plot_breakpoints (bool, optional): set to True to plot breakpoints. Defaults to True.
-        """ 
-
-        if not plot_model and not plot_data:
-            raise ValueError('Either plot_model or plot_data should be set to True.')
-
-        fig, ax = plt.subplots() 
-
-        # Plot original data
-        if plot_data:
-            ax.plot(self.exog_no_const, self.endog, color=data_color, label=data_label)
-        # Check if betas have been calculated
-        if not hasattr(self, 'betas'):
-            if not plot_data:
-                raise ValueError('No data to plot. Neither fit nor fit_regularised have been called.')
-        else:
-            ax.plot(self.exog_no_const, self.y_hat, color=model_color, label=model_label)
-
-        if plot_breakpoints:
-            ax.axvline(x = self.exog_no_const[self.breakpoints[1]], color = 'r', linestyle='dashed', linewidth=1, 
-                       label='Breakpoints')
-            for break_ in self.breakpoints[2:-1]:
-                ax.axvline(x = self.exog_no_const[break_], color = 'r', linestyle='dashed', linewidth=1)
-
-        if legend:
-            ax.legend()
-
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.title(title)
-        plt.show()
     
 def is_pos_def(x):
     return np.linalg.eigvals(x)
