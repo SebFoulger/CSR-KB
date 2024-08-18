@@ -4,17 +4,15 @@ Continuous segmented regression with known breakpoints.
 
 Say there are $m$ segments s.t. segment $j$ is intended to have linear regression $\by_j = \bX_j \bbeta_j$ and is of size $s_j$ where
 
-$$y_j = \begin{pmatrix}
+$$\mathbf{y}_j = \begin{pmatrix}
 y_{j,1} \\
 \vdots \\
 y_{j,s_j}
-\end{pmatrix}$$
-
-, \bX_j = 
+\end{pmatrix}, \mathbf{X}_j = 
 \begin{bmatrix}
--\bx_{j,1}-  \\
+-\mathbf{x}_{j,1}-  \\
 \vdots \\
--\bx_{j,s_j}-
+-\mathbf{x}_{j,s_j}-
 \end{bmatrix}, \boldsymbol{\beta}_j = 
 \begin{bmatrix}
 \beta_{j,1}  \\
