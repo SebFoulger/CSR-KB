@@ -11,20 +11,20 @@
 \DeclareMathOperator{\E}{\mathbb{E}}
 \DeclareMathOperator{\Prob}{\mathbb{P}}
 \DeclareMathOperator{\Var}{\text{Var}}
-\DeclareMathOperator{\bx}{\textbf{x}}
-\DeclareMathOperator{\bb}{\textbf{b}}
-\DeclareMathOperator{\bX}{\textbf{X}}
-\DeclareMathOperator{\by}{\textbf{y}}
-\DeclareMathOperator{\bY}{\textbf{Y}}
-\DeclareMathOperator{\bz}{\textbf{z}}
-\DeclareMathOperator{\bZ}{\textbf{Z}}
-\DeclareMathOperator{\bQ}{\textbf{Q}}
-\DeclareMathOperator{\bW}{\textbf{W}}
-\DeclareMathOperator{\bI}{\textbf{I}}
-\DeclareMathOperator{\bU}{\textbf{U}}
-\DeclareMathOperator{\bV}{\textbf{V}}
-\DeclareMathOperator{\bR}{\textbf{R}}
-\DeclareMathOperator{\ba}{\textbf{a}}
+\DeclareMathOperator{\bx}{\mathbf{x}}
+\DeclareMathOperator{\bb}{\mathbf{b}}
+\DeclareMathOperator{\bX}{\mathbf{X}}
+\DeclareMathOperator{\by}{\mathbf{y}}
+\DeclareMathOperator{\bY}{\mathbf{Y}}
+\DeclareMathOperator{\bz}{\mathbf{z}}
+\DeclareMathOperator{\bZ}{\mathbf{Z}}
+\DeclareMathOperator{\bQ}{\mathbf{Q}}
+\DeclareMathOperator{\bW}{\mathbf{W}}
+\DeclareMathOperator{\bI}{\mathbf{I}}
+\DeclareMathOperator{\bU}{\mathbf{U}}
+\DeclareMathOperator{\bV}{\mathbf{V}}
+\DeclareMathOperator{\bR}{\mathbf{R}}
+\DeclareMathOperator{\ba}{\mathbf{a}}
 \DeclareMathOperator{\bbeta}{\boldsymbol{\beta}}
 \DeclareMathOperator{\bSigma}{\mathbf{\Sigma}}
 \title{Continuous segmented regression with known breakpoints}
@@ -55,11 +55,11 @@ y_{j,s_j}
 \vdots \\
 -\bx_{j,s_j}-
 \end{bmatrix}, \boldsymbol{\beta}_j = 
-\begin{bmatrix}
+\begin{pmatrix}
 \beta_{j,1}  \\
 \vdots \\
 \beta_{j,d}
-\end{bmatrix}.$$
+\end{pmatrix}.$$
 Then the continuous segmented regression problem with known breakpoints (CSR-KB) and weights is
 $$\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j\sum_{i=1}^{s_j} w_{ji}(y_{j, i}-\bx_{j, i}^T\bbeta_j)^2 = \min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j (\by_j-\bX_j\bbeta_j)^T\bW_j(\by_j-\bX_j\bbeta_j)$$
 such that
