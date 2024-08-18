@@ -15,7 +15,7 @@ class CSR_KB:
                  endog: ArrayLike, 
                  breakpoints: ArrayLike, 
                  exog: ArrayLike = None, 
-                 weights: ArrayLike = None, 
+                 obs_weights: ArrayLike = None, 
                  seg_weights: ArrayLike = None, 
                  hasconst: bool = False) -> None:
         """Initializer function for continuous segmented regression with known breakpoints class.
@@ -25,8 +25,8 @@ class CSR_KB:
             breakpoints (ArrayLike): Indices of breakpoints in exogenous data.
             exog (ArrayLike, optional): Exogenous variable. If set to None, exog will be 0, 1,..., nobs. Defaults to 
             None.
-            weights (ArrayLike, optional): Weights for observations. Length of weights must be equal to the number of
-            observations. Set to None if no observation weights are desired. Defaults to None.
+            obs_weights (ArrayLike, optional): Weights for observations. Length of obs_weights must be equal to the 
+            number of observations. Set to None if no observation weights are desired. Defaults to None.
             seg_weights (ArrayLike, optional): Weights for segments. Length of seg_weights must be equal to the number
             of segments. Set to None if no segment weights desired. Defaults to None.
             hasconst (bool, optional): Indicates whether exogenous variable contains a constant. Defaults to False.
@@ -60,13 +60,13 @@ class CSR_KB:
         if not hasconst:
             self.exog = sm.add_constant(self.exog)
         
-        if weights is not None:
-            if len(weights) != self.nobs:
-                raise ValueError('Length of weights must be equal to length of endog')
+        if obs_weights is not None:
+            if len(obs_weights) != self.nobs:
+                raise ValueError('Length of obs_weights must be equal to length of endog')
             
-        self.weights = weights
-        # combined_weights combines the segment and observation weights
-        self.combined_weights = weights
+        self.obs_weights = obs_weights
+        # weights combines the segment and observation weights
+        self.weights = obs_weights
 
         if seg_weights is not None:
             if len(seg_weights) != self.nsegs:
@@ -77,12 +77,12 @@ class CSR_KB:
                 cur_seg_weight = np.repeat(seg_weights[i], self.seg_sizes[i])
                 combined_seg_weights = np.append(combined_seg_weights, cur_seg_weight)
 
-            if self.combined_weights is not None:
+            if self.weights is not None:
                 # If both segment weights and observation weights have been supplied, combine them
-                self.combined_weights = self.combined_weights * combined_seg_weights
+                self.weights = self.weights * combined_seg_weights
             else:
                 # If only segment weights have been supplied, use these as the combined weights
-                self.combined_weights = combined_seg_weights
+                self.weights = combined_seg_weights
         self.seg_weights = seg_weights
         # Whiten exogenous and endogenous variables
         self.wexog = self.whiten(self.exog)
@@ -102,11 +102,11 @@ class CSR_KB:
         Returns:
             ArrayLike: Whitened data (according to segment weights and observation weights).
         """        
-        if self.combined_weights is not None:
+        if self.weights is not None:
             if x.ndim == 1:
-                return np.sqrt(self.combined_weights) * x 
+                return np.sqrt(self.weights) * x 
             else:
-                return np.sqrt(self.combined_weights)[:, None] * x 
+                return np.sqrt(self.weights)[:, None] * x 
         else:
             return x
 
@@ -348,6 +348,47 @@ class CSR_KB:
         plt.title(title)
         plt.show()
 
+    """Properties"""
+
+    @property
+    def df_model(self):
+        if not hasattr(self, '_df_model'):
+            if not hasattr(self, 'rank'):
+                self.rank = np.linalg.matrix_rank(self.exog)
+            self._df_model = float(self.rank - 1)
+        return self._df_model
+
+    @property
+    def llf(self):
+        if not hasattr(self, '_llf'):
+            nobs2 = self.nobs / 2.0
+            for i, (prev_break, next_break) in enumerate(zip(self.breakpoints[:-1], self.breakpoints[1:])):
+                pred = np.dot(self.wexog[prev_break:next_break], self.betas[i].T)
+                SSR = np.sum((self.wendog[prev_break:next_break] - pred)**2, axis=0)
+            llf = -np.log(SSR) * nobs2      # concentrated likelihood
+            llf -= (1+np.log(np.pi/nobs2))*nobs2  # with constant
+            llf += 0.5 * np.sum(np.log(self.weights))
+            self._llf = llf
+        return self._llf
+    
+    @property
+    def aic(self):
+        if not hasattr(self, '_aic'):
+            if not hasattr(self, 'llf'):
+                self.loglike()
+            k_params = self.df_model + 1
+            self._aic = -2 * self.llf + 2 * k_params
+        return self._aic
+    
+    @property
+    def bic(self):
+        if not hasattr(self, '_bic'):
+            if not hasattr(self, 'llf'):
+                self.loglike()
+            k_params = self.df_model + 1
+            self._bic = -2*self.llf + np.log(self.nobs) * k_params
+        return self._bic
+
     """Private Methods"""
 
     def _calculate_betas(self, 
@@ -460,7 +501,7 @@ class CSR_KB:
                 betas.append(_beta[j]+ XTX[j].dot(L[j-1] * self.wexog_init[j] - L[j] * self.wexog_init[j+1]))
             betas.append(_beta[m-1]+L[m-2] * XTX[m-1].dot(self.wexog_init[m-1]))
 
-        return betas
+        return np.array(betas)
     
 def is_pos_def(x):
     return np.linalg.eigvals(x)
