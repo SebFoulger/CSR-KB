@@ -65,7 +65,7 @@ An example usage can be found in [example.ipynb](example.ipynb).
 
 ## Methods
 
-There are currently four available methods for fitting the un-regularized model: 'normal', 'qr', 'qr2', 'svd'. Only 'normal' and 'svd' are implemented for the regularized model.
+There are currently four available methods for fitting the un-regularized model: 'normal', 'qr', 'qr2', 'svd'. Only 'normal' and 'svd' are implemented for the regularized model. All of these models use the method of Lagrange multipliers.
 * 'normal' solves for the closed-form solution with standard matrix and vector operations.
 * 'qr' uses the QR decomposition to avoid inverting any matrices, instead solving upper-triangular linear systems.
 * 'qr2' uses the QR decomposition to require only the inversion of upper-triangular matrices (the R component).
