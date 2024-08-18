@@ -4,12 +4,13 @@ Continuous segmented regression with known breakpoints.
 
 Say there are $m$ segments s.t. segment $j$ is intended to have linear regression $\by_j = \bX_j \bbeta_j$ and is of size $s_j$ where
 
-$$y_j = \begin{pmatrix}$$
-
+$$y_j = \begin{pmatrix}
 y_{j,1} \\
 \vdots \\
 y_{j,s_j}
-\end{pmatrix}, \bX_j = 
+\end{pmatrix}$$
+
+, \bX_j = 
 \begin{bmatrix}
 -\bx_{j,1}-  \\
 \vdots \\
@@ -20,6 +21,7 @@ y_{j,s_j}
 \vdots \\
 \beta_{j,d}
 \end{bmatrix}.$$
+
 Then the continuous segmented regression problem with known breakpoints (CSR-KB) and weights is
 $$\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j\sum_{i=1}^{s_j} w_{ji}(y_{j, i}-\bx_{j, i}^T\bbeta_j)^2 = \min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j (\by_j-\bX_j\bbeta_j)^T\bW_j(\by_j-\bX_j\bbeta_j)$$
 such that
