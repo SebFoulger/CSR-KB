@@ -8,7 +8,9 @@ $$y_j = \begin{pmatrix}
 y_{j,1} \\
 \vdots \\
 y_{j,s_j}
-\end{pmatrix}, X_j = 
+\end{pmatrix}$$
+
+$$, X_j = 
 \begin{bmatrix}
 -x_{j,1}-  \\
 \vdots \\
