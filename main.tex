@@ -64,8 +64,9 @@ Then the continuous segmented regression problem with known breakpoints (CSR-KB)
 $$\min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j\sum_{i=1}^{s_j} w_{ji}(y_{j, i}-\bx_{j, i}^T\bbeta_j)^2 = \min_{\bbeta_1,...,\bbeta_m} \sum_{j=1}^m w'_j (\by_j-\bX_j\bbeta_j)^T\bW_j(\by_j-\bX_j\bbeta_j)$$
 such that
 $$\bx_{j, 1}^T \bbeta_j = \bx_{j, 1}^T \bbeta_{j-1}, \text{ for }j=2, ..., m.$$
-The regression weights are given by $w_{ji} > 0$ for $j\in \{1, ..., m\}, i \in \{1, ..., s_j\}$, $\bW_j = \text{diag}(w_{j1}, ..., w_{js_j})$. The segment weights are given by $w'_j > 0$ for $j \in \{1, ..., m\}$. Note that the segment weights could've been implemented through the regression weights, but for ease of use, these have been separated. 
+The regression weights are given by $w_{ji} > 0$ for $j\in \{1, ..., m\}, i \in \{1, ..., s_j\}$, $\bW_j = \text{diag}(w_{j1}, ..., w_{js_j})$. The segment weights are given by $w'_j > 0$ for $j \in \{1, ..., m\}$.
 \end{defn}
+Note that the segment weights could've been implemented through the regression weights, but for ease of use, these have been separated. 
 \begin{prop}[] \label{prop:convert}
 CSR-KB with weights can be converted to a CSR-KB problem without weights.
 \end{prop}
@@ -82,9 +83,7 @@ $$\bx_{j, 1}^T \bbeta_j = \bx_{j, 1}^T \bbeta_{j-1}$$
 $$\iff \sqrt{w'_j w_{j,1}} \cdot \bx_{j, 1}^T \bbeta_j = \sqrt{w'_j w_{j,1}} \cdot \bx_{j, 1}^T \bbeta_{j-1} $$
 $$\iff \bx_{j, 1}'^T \bbeta_j = \bx_{j, 1}'^T \bbeta_{j-1}.$$
 \end{proof}
-\begin{remark}
 We only need to solve CSR-KB without weights by using the above whitening process.
-\end{remark}
 \begin{prop} \label{prop:main}
 CSR-KB has a closed-form solution. 
 \end{prop}
@@ -129,15 +128,33 @@ This can be represented as
 $$\mathbf{A} \boldsymbol{\lambda}'=\mathbf{c}$$
 where $\mathbf{A}$ is tri-diagonal. Note that $\mathbf{A}_{j, j-1}=\mathbf{A}_{j-1,j}$ and so $\mathbf{A}^T=\mathbf{A}$. Solving for $\boldsymbol{\lambda}'$ and plugging in to Equation \ref{eqn:beta} yields the solution.
 \end{proof}
-\begin{remark}
 The solution for $\bbeta_j$ can be written as
 $$\bbeta_j=\begin{cases}
 (\bX_1^T  \bX_1)^{-1}\bX_1^T \by_1 -\frac{\lambda_{2}}{2}(\bX_1^T  \bX_1)^{-1}\bx_{2, 1} & j=1 \\
 (\bX_j^T  \bX_j)^{-1}\bX_j^T \by_j + (\bX_j^T  \bX_j)^{-1}(\frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
 (\bX_m^T \bX_m)^{-1}\bX_m^T \by_m + \frac{\lambda_m}{2}(\bX_m^T \bX_m)^{-1}\bx_{m, 1} & j=m.
 \end{cases}$$
-Since $(\bX_j^T  \bX_j)^{-1}$ and $(\bX_j^T  \bX_j)^{-1}\bX_j^T \by_j$ will have already been calculated for each $j$ to calculate $\boldsymbol{\lambda}'$, writing the solution in this form allows for efficient calculation of $\bbeta_j$.
-\end{remark}
+Since $(\bX_j^T  \bX_j)^{-1}$ and $(\bX_j^T  \bX_j)^{-1}\bX_j^T \by_j$ will have already been calculated for each $j$ to calculate $\boldsymbol{\lambda}'$, writing the solution in this form allows for efficient calculation of $\bbeta_j$. \\ \\
+
+
+
+The set of points that are considered in-sample will be defined as a union of hyper-rectangles, with each hyper-rectangle being the minimum hyper-rectangle that contains all the points in that segment and the first point of the next segment. Specifically,
+$$S= \bigcup_{j=1}^m S_j$$
+where
+$$S_j = \{\bx=(x_1, ..., x_d): a_{ji} \leq x_i \leq b_{ji} \ \forall 1 \leq i \leq d\}.$$
+For $j=1, ..., m-1$:
+$$a_{ji} = \min\{(\bx_{j, 1})_i, (\bx_{j, 2})_i, ..., (\bx_{j, s_j})_i, (\bx_{j+1, 1})_i\},$$
+$$b_{ji} = \max\{(\bx_{j, 1})_i, (\bx_{j, 2})_i, ..., (\bx_{j, s_j})_i, (\bx_{j+1, 1})_i\}.$$
+And
+$$a_{mi} = \min\{(\bx_{m, 1})_i, (\bx_{m, 2})_i, ..., (\bx_{m, s_m})_i\},$$
+$$b_{mi} = \max\{(\bx_{m, 1})_i, (\bx_{m, 2})_i, ..., (\bx_{m, s_m})_i\}.$$
+The reason we include the first point of the next segment is due to our continuity condition - this gives us a natural way of extending our sample space so that we don't exclude points that lie just between two segments. \\ \\
+To calculate a prediction for some new point, it should be calculated which $S_j$ the point falls in to, and then use the corresponding $\bbeta_j$. One should be careful with overlapping $S_j$, since the resultant model will then be one-to-many.
+
+
+
+
+
 
 
 
@@ -164,9 +181,7 @@ $$\iff \bR_j\bbeta_j = \bQ_j^T \by_j$$
 So we can solve for $\bbeta_j$ using the fact $\bR_j$ is upper-triangular. Applying these two methods then yields an equivalent solution.
 \end{proof}
 
-\begin{remark}
 Since $\bR_j$ is upper triangular, solving equations with this matrix can be done efficiently.
-\end{remark}
 
 \begin{prop}[QR solution 2] There is a method that uses (reduced) QR decomposition and produces an equivalent solution for the CSR-KB problem, as long as the $\bR$ component of each decomposition is invertible.
 \end{prop}
@@ -177,9 +192,7 @@ $$(\bX_j^T \bX_j)^{-1} = (\bR_j^T \bR_j)^{-1} = \bR_j^{-1} (\bR_j^{-1})^T$$
 since $\bR_j$ is invertible. Replacing every occurrence of $(\bX_j^T \bX_j)^{-1}$ with the above then yields an equivalent solution.
 \end{proof}
 
-\begin{remark}
 The benefit of this approach is that upper triangular matrices can be inverted more efficiently.
-\end{remark}
 
 \begin{defn}[CSR-KB with weights and regularisation]
 The CSR-KB problem with weights, regularisation function 
@@ -257,7 +270,7 @@ Substituting into the solution for $\bbeta_j$ yields
 \bV_m(\bSigma_m^2+\mu_m\bI_d)^{-1}(\bSigma_m \bU_m^T \by_m + \frac{\lambda_m}{2}\bV_m^T\bx_{m, 1}) & j=m. \end{cases}
 \end{equation}
 \end{proof}
-\begin{remark}
+
 The primary benefit of this approach is that 
 $$\bSigma_j^2+\mu_j\bI_d$$
 is diagonal for all $j$, so inverting it is easy to compute in linear time. Additionally, its inverse and all the $\bSigma_j$ are diagonal, which means multiplying with these can be computed in quadratic time (as opposed to cubic). Also, as was mentioned in the original solution, $\bbeta_j$ can be written as 
@@ -266,11 +279,6 @@ $$\bbeta_j=\begin{cases}
 \bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bSigma_j \bU_j^T \by_j + \bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T(\frac{\lambda_j}{2}\bx_{j, 1}-\frac{\lambda_{j+1}}{2}\bx_{j+1, 1}) & 2 \leq j \leq m-1 \\
 \bV_m(\bSigma_m^2+\mu_m\bI_d)^{-1}\bSigma_m \bU_m^T \by_m + \frac{\lambda_m}{2}\bV_m(\bSigma_m^2+\mu_m\bI_d)^{-1}\bV_m^T\bx_{m, 1} & j=m. \end{cases}$$
 Since $\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bSigma_j \bU_j^T \by_j$ and $\bV_j(\bSigma_j^2+\mu_j\bI_d)^{-1}\bV_j^T$ will have already been calculated, $\bbeta_j$ can be calculated efficiently.
-\end{remark}
-
-\begin{prop}
-MINIMUM. KKT?
-\end{prop}
 
 \begin{prop}
 TIME COMPLEXITY. \\
