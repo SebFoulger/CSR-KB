@@ -197,6 +197,10 @@ class CSR_KB:
         ----------
         method : Literal['svd', 'qr', 'qr2', 'normal'], optional
             Method to use for fitting. By default 'svd'
+        Parameters
+        ----------
+        method : Literal['svd', 'qr', 'qr2', 'normal'], optional
+            Method to use for fitting. By default 'svd'
 
         Returns
         -------
@@ -331,6 +335,12 @@ class CSR_KB:
         exogenous data X and endogenous data y of each segment, passing these on to _calculate_betas
         which does the rest of the calculation.
 
+        Parameters
+        ----------
+        mu : float
+            L2 penalty parameter.
+        method : Literal['svd', 'normal'], optional
+            Method for fitting regularized model. By default 'svd'.
         Parameters
         ----------
         mu : float
