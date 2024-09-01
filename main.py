@@ -20,20 +20,28 @@ class CSR_KB:
                  hasconst: bool = False) -> None:
         """Initializer function for continuous segmented regression with known breakpoints class.
 
-        Args:
-            endog (ArrayLike): Endogenous variable.
-            breakpoints (ArrayLike): Indices of breakpoints in exogenous data.
-            exog (ArrayLike, optional): Exogenous variable. If set to None, exog will be 0, 1,..., nobs. Defaults to 
-            None.
-            obs_weights (ArrayLike, optional): Weights for observations. Length of obs_weights must be equal to the 
-            number of observations. Set to None if no observation weights are desired. Defaults to None.
-            seg_weights (ArrayLike, optional): Weights for segments. Length of seg_weights must be equal to the number
-            of segments. Set to None if no segment weights desired. Defaults to None.
-            hasconst (bool, optional): Indicates whether exogenous variable contains a constant. Defaults to False.
-        """             
+        Parameters
+        ----------
+        endog : ArrayLike
+            Endogenous variable.
+        breakpoints : ArrayLike
+            Indices of breakpoints in exogenous data.
+        exog : ArrayLike, optional
+            Exogenous variable. If set to None, exog will be 0, 1,..., nobs. By default None.
+        obs_weights : ArrayLike, optional
+            Weights for observations. Length of obs_weights must be equal to the number of 
+            observations. Set to None if no observation weights are desired. By default None.
+        seg_weights : ArrayLike, optional
+            Weights for segments. Length of seg_weights must be equal to the number of segments. Set
+            to None if no segment weights desired. By default None.
+        hasconst : bool, optional
+            Indicates whether exogenous variable contains a constant. By default False.
+        """        
+      
         self.endog = endog
         # number of observations
         self.nobs = len(endog)
+        self.ndim = exog.shape[1]
         self.breakpoints = np.sort(breakpoints)
         # Ensure breakpoints starts with 0
         if breakpoints[0] != 0:
@@ -44,26 +52,46 @@ class CSR_KB:
         self.nsegs = len(breakpoints) - 1
         # Sizes of segments
         self.seg_sizes = np.diff(breakpoints)
-        
         if exog is None:
             if hasconst:
-                warnings.warn(('No exogenous variable provided but hasconst is set to True. Setting hasconst to False ' 
-                               'and proceeding.'), RuntimeWarning)
+                warnings.warn(('No exogenous variable provided but hasconst is set to True. Setting' 
+                               ' hasconst to False and proceeding.'), RuntimeWarning)
                 hasconst = False
             self.exog = np.arange(len(endog))
         else:
             if len(exog) != self.nobs:
                 raise ValueError('Length of exog must be equal to length of endog') 
             self.exog = exog
+        # Check that the length of the observation weights is equal to the number of observations
+        if obs_weights is not None:
+            if len(obs_weights) != self.nobs:
+                raise ValueError('Length of obs_weights must be equal to length of endog')
         # exog_no_const is exogenous variable with no constant
         self.exog_no_const = self.exog
         if not hasconst:
             self.exog = sm.add_constant(self.exog)
+        # Defining in-sample exogenous values
+        in_sample = []
+        for i in range(self.nsegs):
+            # This includes the first x value of the next segment since the sample space should
+            # extend from one segment to the next, i.e. there is no gaps between segments for the
+            # sample space. See the mathematical documentation for more details. 
+            X = self.exog[self.breakpoints[i]:(self.breakpoints[i+1]+1)]
+            if self.ndim==1:
+                X_min = np.min(X)
+                X_max = np.max(X)
+                rec = np.array([[X_min, X_max]])
+            else:
+                X_min = np.min(X, axis=0)
+                X_max = np.max(X, axis=0)
+                rec = np.array(list(zip(X_min, X_max)))
+            in_sample.append(rec)
         
-        if obs_weights is not None:
-            if len(obs_weights) != self.nobs:
-                raise ValueError('Length of obs_weights must be equal to length of endog')
-            
+        # IMPLEMENT WARNING IF SAMPLES OVERLAP
+
+        
+        self.in_sample = in_sample
+
         self.obs_weights = obs_weights
         # weights combines the segment and observation weights
         self.weights = obs_weights
@@ -96,12 +124,16 @@ class CSR_KB:
                x: ArrayLike) -> ArrayLike:
         """Whitening method for model data.
 
-        Args:
-            x (ArrayLike): data to whiten. 
+        Parameters
+        ----------
+        x : ArrayLike
+            Data to whiten. 
 
-        Returns:
-            ArrayLike: Whitened data (according to segment weights and observation weights).
-        """        
+        Returns
+        -------
+        ArrayLike
+            Whitened data (according to segment weights and observation weights).
+        """           
         if self.weights is not None:
             if x.ndim == 1:
                 return np.sqrt(self.weights) * x 
@@ -114,15 +146,20 @@ class CSR_KB:
             method: Literal['svd', 'qr', 'qr2', 'normal'] = 'svd') -> ArrayLike:
         """Fitting method.
 
-        This method calculates (X.T @ X)^(-1) and (X.T @ X)^(-1) @ X.T @ y for exogenous data X and endogenous data y
-        of each segment, passing these on to _calculate_betas which does the rest of the calculation.
+        This method calculates (X.T @ X)^(-1) and (X.T @ X)^(-1) @ X.T @ y for exogenous data X and 
+        endogenous data y of each segment, passing these on to _calculate_betas which does the rest 
+        of the calculation.
 
-        Args:
-            method (Literal['svd', 'qr', 'qr2', 'normal'], optional): method to use for fitting. Defaults to 'svd'.
+        Parameters
+        ----------
+        method : Literal['svd', 'qr', 'qr2', 'normal'], optional
+            Method to use for fitting. By default 'svd'
 
-        Returns:
-            ArrayLike: beta coefficients for the model.
-        """
+        Returns
+        -------
+        ArrayLike
+            Beta coefficients for the model.
+        """        
         m = self.nsegs
         # _beta will store (X.T @ X)^(-1) @ X.T @ y for exogenous data X and endogenous data y of each segment
         _beta = []
@@ -231,15 +268,21 @@ class CSR_KB:
                         method: Literal['svd', 'normal'] = 'svd') -> ArrayLike:
         """Fits L2 regularised model.
 
-        This method calculates (X.T @ X + mu * I)^(-1) and (X.T @ X + mu * I)^(-1) @ X.T @ y for exogenous data X and 
-        endogenous data y of each segment, passing these on to _calculate_betas which does the rest of the calculation.
+        This method calculates (X.T @ X + mu * I)^(-1) and (X.T @ X + mu * I)^(-1) @ X.T @ y for 
+        exogenous data X and endogenous data y of each segment, passing these on to _calculate_betas 
+        which does the rest of the calculation.
 
-        Args:
-            mu (float): L2 penalty parameter.
-            method (Literal['svd', 'normal'], optional): Method for fitting regularized model. Defaults to 'svd'.
+        Parameters
+        ----------
+        mu : float
+            L2 penalty parameter.
+        method : Literal['svd', 'normal'], optional
+            Method for fitting regularized model. By default 'svd'.
 
-        Returns:
-            ArrayLike: beta coefficients for the model.
+        Returns
+        -------
+        ArrayLike
+            Beta coefficients for the model.
         """        
         m = self.nsegs
         # XTX will store (X.T @ X)^(-1) for exogenous data X of each segment
@@ -288,6 +331,31 @@ class CSR_KB:
         self.y_hat = y_hat
         return betas
 
+    def in_predict(self, 
+                params: ArrayLike, 
+                exog: ArrayLike = None):
+        """In-sample predictions from model. 
+
+        Parameters
+        ----------
+        params : ArrayLike
+            _description_
+        exog : ArrayLike, optional
+            _description_, by default None
+
+        Returns
+        -------
+        _type_
+            _description_
+        """        
+
+        # IMPLEMENT THIS PROPERLY
+
+        if exog is None:
+            exog = self.exog
+
+        return np.dot(exog, params)
+
     def plot(self,
              plot_model: bool = True,
              plot_data: bool = True,
@@ -302,19 +370,31 @@ class CSR_KB:
              plot_breakpoints: bool = True) -> None:
         """Plot model and/or original data.
 
-        Args:
-            plot_model (bool, optional): set to True to plot model data. Defaults to True.
-            plot_data (bool, optional): set to True to plot original data. Defaults to True.
-            model_color (str, optional): color of model data line. Set to None for default color. Defaults to None.
-            data_color (str, optional): color of original data line. Set to None for default color. Defaults to None.
-            title (str, optional): title for plot. Defaults to 'CSR-KB plot'.
-            xlabel (str, optional): x-axis label for plot. Set to None for no label. Defaults to None.
-            ylabel (str, optional): y-axis label for plot. Set to None for no label. Defaults to None.
-            legend (bool, optional): set to True to include legend in plot. Defaults to True.
-            model_label (str, optional): model data line label. Defaults to 'Model'.
-            data_label (str, optional): original data line label. Defaults to 'Data'.
-            plot_breakpoints (bool, optional): set to True to plot breakpoints. Defaults to True.
-        """ 
+        Parameters
+        ----------
+        plot_model : bool, optional
+            Set to True to plot model data. By default True.
+        plot_data : bool, optional
+            Set to True to plot original data. By default True.
+        model_color : str, optional
+            Color of model data line. Set to None for default color. By default None.
+        data_color : str, optional
+            Color of original data line. Set to None for default color. By default None.
+        title : str, optional
+            Title for plot. Defaults to 'CSR-KB plot'. By default 'CSR-KB plot'.
+        xlabel : str, optional
+            x-axis label for plot. Set to None for no label. By default None.
+        ylabel : str, optional
+            y-axis label for plot. Set to None for no label. By default None.
+        legend : bool, optional
+            Set to True to include legend in plot. By default True.
+        model_label : str, optional
+            Model data line label. By default 'Model'.
+        data_label : str, optional
+            Original data line label. By default 'Data'.
+        plot_breakpoints : bool, optional
+            Set to True to plot breakpoints. By default True.
+        """        
 
         if self.exog_no_const.ndim != 1:
             raise ValueError('Can only plot data with univariate exogenous variable.')
@@ -352,11 +432,28 @@ class CSR_KB:
 
     @property
     def df_model(self):
+        """
+        Degree of freedom of the model. Defined as the rank of the regressor matrix minus 1 if a 
+        constant is included.
+        """
         if not hasattr(self, '_df_model'):
             if not hasattr(self, 'rank'):
                 self.rank = np.linalg.matrix_rank(self.exog)
             self._df_model = float(self.rank - 1)
         return self._df_model
+
+    @property
+    def df_resid(self):
+        """
+        Degree of freedom of the residuals. Defined as the number of observations minus the rank of 
+        the regressor matrix.
+        """
+
+        if not hasattr(self, '_df_model'):
+            if not hasattr(self, 'rank'):
+                self.rank = np.linalg.matrix_rank(self.exog)
+            self._df_resid = self.nobs - self.rank
+        return self._df_resid
 
     @property
     def llf(self):
